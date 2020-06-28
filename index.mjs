@@ -1,32 +1,47 @@
-import { rootActor } from "./root.mjs";
+
+
+const DEFAULT = 'DEFAULT'
+
 function spawn(actorSystem, actorDefinition) {
-    const length = Object.keys(actorSystem.actors).length;
-    actorSystem.actors[length + 1] = actorDefinition;
-    console.log(actorDefinition.start.toString());
+    const id = Math.random().toString(36).substr(2, 9);
+    actorSystem.actors[id] = Object.assign(actorDefinition, { id });
+
+    return id
 }
 
 function tell(receiver, sender, type, message) {
-
     const msg = {
         sender,
         receiver,
         type,
-        message
-    }
+        message,
+    };
 
-    globalThis.dispatchEvent(new CustomEvent("actor:message", { detail: msg }))
+    globalThis.dispatchEvent(new CustomEvent("actor:message", { detail: msg }));
+}
+
+function createWorkerCode(id) {
+    const workerCode = `
+    onmessage = function onMessageHandler(e){
+        console.log('from worker', ${id}, e)
+    }
+`;
+    const blob = new Blob([workerCode], { type: "application/javascript" });
+
+    return URL.createObjectURL(blob);
 }
 
 function ActorSystem(settings) {
     const workerList = {};
-    const workerURL = new URL("worker.mjs", window.location.origin);
+    let currentWorker = 0;
+    let maxWorkers = window.navigator.hardwareConcurrency - 1;
 
     this.actors = {};
 
-    for (let i = 0; i < window.navigator.hardwareConcurrency; i++) {
-        workerList[i] = new Worker(workerURL);
+    for (let i = 0; i <= maxWorkers; i++) {
+        workerList[i] = new Worker(createWorkerCode(i));
     }
-
+    console.log(workerList);
 
     if (settings.root) {
         spawn(this, settings.root);
@@ -35,29 +50,78 @@ function ActorSystem(settings) {
     globalThis.addEventListener("actor:message", ({ detail }) => {
         console.log("on messaage", detail, this.actors);
 
-        if (detail.sender in this.actors) {
-            console.log('actor?', this.actors[detail.sender])
-            workerList[0].postMessage(detail)
-            this.actors[detail.sender][detail.type]({ ...detail })
+        if (detail.receiver in this.actors) {
+            // console.log("actor?", this.actors[detail.sender]);
+            workerList[currentWorker].postMessage(detail);
+            currentWorker = currentWorker < maxWorkers ? currentWorker + 1 : 0;
+            this.actors[detail.receiver].handlers[this.actors[detail.receiver].behavior.current][detail.type]({
+                message: detail.message,
+                sender: detail.sender,
+                spawn: (actorDefinition) => spawn(this, actorDefinition),
+                tell: (id, type, message) => tell(id, detail.sender, type, message)
+            });
         }
-
     });
 
     if (settings.debug) {
         globalThis.Thesis = {
             version: 1,
             getActors: () => this.actors,
-            tell: (pid, text) => tell('repl', pid, 'start', text),
+            tell: (pid, text) => tell(pid, "repl", "start", text),
         };
     }
 }
 
-export function actor(def) {
-    return def
+
+export function actor(handlers, {
+    default_behaviour = DEFAULT
+} = {}) {
+
+    if (!Reflect.has(handlers, default_behaviour)) {
+        handlers = {
+            [default_behaviour]: handlers
+        }
+    }
+
+    return Object.create(null, {
+        // id: {
+        //     value: Symbol.for(Math.random().toString(36).substr(2, 9)),
+        //     writable: false,
+        // },
+        handlers: {
+            value: handlers,
+            writable: false
+        },
+        mailbox: {
+            value: []
+        },
+        behavior: {
+            value: {
+                current: DEFAULT
+            },
+        }
+    });
 }
 
 
+const echo = actor({
+    print({ message }) {
+        console.log('Echo:', message)
+    }
+})
+
+const rootActor = actor({
+    start({ message, spawn, tell }) { // message, sender, tell, ask, spawn, link, become, unbecome
+        console.log("Received", message);
+        const a = spawn(echo)
+        console.log('pid??', a)
+        tell(a, 'print', '[proxied] ' + message)
+    },
+});
+
+
 const myApp = new ActorSystem({
+    actors: [rootActor, echo],
     root: rootActor,
     debug: true,
 });
