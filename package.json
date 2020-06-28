@@ -1,0 +1,23 @@
+{
+  "name": "ortoo",
+  "version": "0.0.1",
+  "description": "Actor Model library for JavaScript environments",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AlfonsoFilho/ortoo.git"
+  },
+  "author": {
+    "name": "Alfonso Filho",
+    "email": "alfonsocfilho@gmail.com"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/AlfonsoFilho/ortoo/issues"
+  },
+  "homepage": "https://github.com/AlfonsoFilho/ortoo#readme",
+  "devDependencies": {}
+}
