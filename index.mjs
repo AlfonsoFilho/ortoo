@@ -2,9 +2,12 @@
 
 const DEFAULT = 'DEFAULT'
 
-function spawn(actorSystem, actorDefinition) {
+async function spawn(actorSystem, modPath) {
+    const url = new URL(modPath, location.origin)
+    const actorDefinition = await import(url.href).then(mod => mod.default)
+
     const id = Math.random().toString(36).substr(2, 9);
-    actorSystem.actors[id] = Object.assign(actorDefinition, { id });
+    actorSystem.actors[id] = Object.assign(actorDefinition, { id, url: url.href });
 
     return id
 }
@@ -20,48 +23,78 @@ function tell(receiver, sender, type, message) {
     globalThis.dispatchEvent(new CustomEvent("actor:message", { detail: msg }));
 }
 
-function createWorkerCode(id) {
-    const workerCode = `
-    onmessage = function onMessageHandler(e){
-        console.log('from worker', ${id}, e)
-    }
-`;
-    const blob = new Blob([workerCode], { type: "application/javascript" });
 
-    return URL.createObjectURL(blob);
+function WorkerPool(url, onMessage) {
+    this.maxWorkers = navigator.hardwareConcurrency;
+    this.currentWorker = 0
+    this.workerList = [];
+    this.postMessage = (data) => {
+        this.workerList[this.currentWorker].postMessage(data);
+        this.currentWorker = this.currentWorker < this.maxWorkers ? this.currentWorker + 1 : 0;
+    }
+
+    for (let i = 0; i <= this.maxWorkers; i++) {
+        this.workerList[i] = new Worker(url, { name: i, type: 'module' });
+        this.workerList[i].onmessage = onMessage
+    }
 }
 
+
 function ActorSystem(settings) {
-    const workerList = {};
-    let currentWorker = 0;
-    let maxWorkers = window.navigator.hardwareConcurrency - 1;
+
+
+    const onMessageFromWorker = async (e) => {
+
+        switch (e.data.cmd) {
+            case 'spawn':
+                // console.log('spawn', e.data)
+                const id = await spawn(this, e.data.actor.url)
+                console.log('spawnder', e.data, id)
+                break;
+
+            default:
+                console.log('message from worker pool', e.data)
+                break;
+        }
+    }
+
+    const workerUrl = new URL('./worker.mjs', location.origin)
+    // const pool = new WorkerPool(createWorkerCode(settings.actors), function onMessageFromWorker(e) {
+    const pool = new WorkerPool(workerUrl.href, onMessageFromWorker)
 
     this.actors = {};
-
-    for (let i = 0; i <= maxWorkers; i++) {
-        workerList[i] = new Worker(createWorkerCode(i));
-    }
-    console.log(workerList);
 
     if (settings.root) {
         spawn(this, settings.root);
     }
 
     globalThis.addEventListener("actor:message", ({ detail }) => {
-        console.log("on messaage", detail, this.actors);
+        // console.log("on messaage", detail, this.actors);
 
         if (detail.receiver in this.actors) {
-            // console.log("actor?", this.actors[detail.sender]);
-            workerList[currentWorker].postMessage(detail);
-            currentWorker = currentWorker < maxWorkers ? currentWorker + 1 : 0;
-            this.actors[detail.receiver].handlers[this.actors[detail.receiver].behavior.current][detail.type]({
-                message: detail.message,
-                sender: detail.sender,
-                spawn: (actorDefinition) => spawn(this, actorDefinition),
-                tell: (id, type, message) => tell(id, detail.sender, type, message)
-            });
+            const actor = this.actors[detail.receiver]
+            const workerMessage = {
+                url: actor.url,
+                id: actor.id,
+                behavior: actor.behavior.current,
+                type: detail.type,
+                msg: detail
+            }
+            pool.postMessage(workerMessage)
+            // this.actors[detail.receiver].handlers[this.actors[detail.receiver].behavior.current][detail.type]({
+            //     message: detail.message,
+            //     sender: detail.sender,
+            //     spawn: (actorDefinition) => spawn(this, actorDefinition),
+            //     tell: (id, type, message) => tell(id, detail.sender, type, message)
+            // });
         }
     });
+
+
+
+    // requestAnimationFrame()
+
+
 
     if (settings.debug) {
         globalThis.Thesis = {
@@ -92,9 +125,9 @@ export function actor(handlers, {
             value: handlers,
             writable: false
         },
-        mailbox: {
-            value: []
-        },
+        // mailbox: {
+        //     value: []
+        // },
         behavior: {
             value: {
                 current: DEFAULT
@@ -104,25 +137,24 @@ export function actor(handlers, {
 }
 
 
-const echo = actor({
-    print({ message }) {
-        console.log('Echo:', message)
-    }
-})
+// const echo = actor({
+//     print({ message }) {
+//         console.log('Echo:', message)
+//     }
+// })
 
-const rootActor = actor({
-    start({ message, spawn, tell }) { // message, sender, tell, ask, spawn, link, become, unbecome
-        console.log("Received", message);
-        const a = spawn(echo)
-        console.log('pid??', a)
-        tell(a, 'print', '[proxied] ' + message)
-    },
-});
+// const rootActor = actor({
+//     start({ message, spawn, tell }) { // message, sender, tell, ask, spawn, link, become, unbecome
+//         console.log("Received", message);
+//         const a = spawn(echo)
+//         console.log('pid??', a)
+//         tell(a, 'print', '[proxied] ' + message)
+//     },
+// });
 
 
 const myApp = new ActorSystem({
-    actors: [rootActor, echo],
-    root: rootActor,
+    root: './root.mjs',
     debug: true,
 });
 /*
