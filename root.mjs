@@ -1,4 +1,4 @@
-import { actor } from "./index.mjs";
+import { actor } from "./actor.mjs";
 
 export default actor({
     async start({ message, spawn, tell }) { // message, sender, tell, ask, spawn, link, become, unbecome
