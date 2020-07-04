@@ -24,7 +24,12 @@ export function actor(handlers, settings = {
     }
 
     message.tell(
-      { type: STARTED, receiver: message.sender, sender: message.id },
+      {
+        type: STARTED,
+        receiver: message.sender,
+        sender: message.id,
+        id: message.messageId,
+      },
     );
   };
 

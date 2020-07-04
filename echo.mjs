@@ -10,4 +10,7 @@ export default actor({
       message.payload,
     );
   },
+  ciao({ reply, sender, payload }) {
+    reply({ receiver: sender, payload: payload + " world", type: "REPLY" });
+  },
 });

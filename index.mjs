@@ -8,10 +8,10 @@ function WorkerPool(url, onMessage) {
   this.currentWorker = 0;
   this.workerList = [];
   /**
-     * 
-     * @param message {import("./types").Message}
-     * @param options {object}
-     */
+       * 
+       * @param message {import("./types").Message}
+       * @param options {object}
+       */
   this.postMessage = (message, options = {}) => {
     if (options.workerId) {
       // console.log('single', options.workerId, message)
@@ -43,9 +43,6 @@ function WorkerPool(url, onMessage) {
     };
     this.workerList[i].instance.postMessage(message);
   }
-}
-
-async function Router() {
 }
 
 function ActorSystem(settings) {

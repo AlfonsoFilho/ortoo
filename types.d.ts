@@ -6,7 +6,13 @@ export interface Address {
 type NodeID = number;
 type ActorID = number;
 
+export interface Context {
+  currentWorker: string;
+  workers: string[];
+}
+
 export interface Message {
+  id: string;
   sender: string;
   receiver: string;
   type: string | number;

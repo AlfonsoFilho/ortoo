@@ -1,11 +1,16 @@
-import { SPAWN } from "./constants.mjs";
-import { CONTEXT_SET } from "./constants.mjs";
-import { SYSTEM } from "./constants.mjs";
-import { STARTED } from "./constants.mjs";
-
 /**
  * @typedef {import("./types").Message} Message
+ * @typedef {import("./types").Context} Context
  */
+
+import {
+  SPAWN,
+  REPLY,
+  CONTEXT_SET,
+  SYSTEM,
+  STARTED,
+  RESUME,
+} from "./constants.mjs";
 
 class ActorsNode {
   constructor() {
@@ -15,8 +20,10 @@ class ActorsNode {
   }
 
   /**
-         * @param url {string}
-         */
+     * @param {string} url
+     * @param {Message} message
+     * @returns { Promise<void> }
+     */
   async spawn(url, message) {
     const actorDef = await import(url).then((mod) => mod.default);
     const actor = actorDef.spawn(self.name, ++this.autoIncrement, url);
@@ -28,36 +35,59 @@ class ActorsNode {
         type: "start",
         receiver: actor.id,
         sender: message.sender,
-        payload: "spawining",
+        payload: undefined,
+        id: message.id,
       },
     );
   }
 
   /**
-       * @param message {Message}
-       */
+     * @returns {string}
+     */
+  generateID() {
+    return Math.random().toString(32).substring(2, 12);
+  }
+
+  /**
+     * @param {Message} message
+     */
   send(message) {
+    if (!message.id) {
+      message.id = this.generateID();
+    }
+
     if (message.receiver && message.receiver[0] === self.name) {
+      switch (message.type) {
+        case SPAWN:
+          this.spawn(message);
+          break;
+
+        default:
+          break;
+      }
       this.readAndAct(message);
     } else {
       postMessage(message);
     }
   }
 
+  /**
+     * @param { Context } ctx - System context
+     */
   setContext(ctx) {
     this.ctx = ctx;
   }
 
   /**
-       * @param message {Message}
-       */
+     * @param {Message} message
+     */
   readAndAct(message) {
     const actor = this.actors[message.receiver];
     const behavior = actor.behavior.current;
 
-    if (message.type === STARTED) {
+    if (message.type === REPLY || message.type === STARTED) {
       self.dispatchEvent(
-        new CustomEvent("::resume", { detail: message.sender }),
+        new CustomEvent(RESUME + message.id, { detail: message.sender }),
       );
     }
 
@@ -70,9 +100,12 @@ class ActorsNode {
           payload: message.payload,
           ctx: this.ctx,
           id: actor.id,
+          messageId: message.id,
           spawn: async (url, options = {}) =>
             new Promise((resolve, reject) => {
-              self.addEventListener("::resume", (e) =>
+              const msgId = this.generateID();
+
+              self.addEventListener(RESUME + msgId, (e) =>
                 resolve(e.detail), { once: true });
               this.send(
                 {
@@ -80,6 +113,7 @@ class ActorsNode {
                   receiver: SYSTEM,
                   sender: actor.id,
                   payload: { url },
+                  id: msgId,
                 },
               );
             }),
@@ -89,11 +123,22 @@ class ActorsNode {
           tell: (msg) => {
             this.send({ ...msg, sender: actor.id });
           },
-          ask: async () =>
-            new Promise(() => {
-              self.addEventListener("::resume", (e) =>
+          reply: (msg) => {
+            this.send(
+              {
+                ...msg,
+                type: REPLY,
+                sender: actor.id,
+                receiver: message.sender,
+                id: message.id,
+              },
+            );
+          },
+          ask: async (msg) =>
+            new Promise((resolve, reject) => {
+              self.addEventListener(RESUME + message.id, (e) =>
                 resolve(e.detail), { once: true });
-              this.send({ ...msg, sender: actor.id });
+              this.send({ ...msg, sender: actor.id, id: message.id });
             }),
         },
       );
@@ -103,7 +148,11 @@ class ActorsNode {
 
 const node = new ActorsNode();
 
+/**
+ * @param { { data: Message } }
+ */
 onmessage = async ({ data }) => {
+  // node.send(data)
   switch (data.type) {
     case SPAWN: {
       node.spawn(data.payload.url, data);
@@ -117,6 +166,7 @@ onmessage = async ({ data }) => {
 
     case STARTED:
     default: {
+      // console.log('message', self.name, data)
       node.send(data);
       break;
     }
