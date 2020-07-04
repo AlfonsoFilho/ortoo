@@ -1,1 +1,1 @@
-export const SPAWN = 0
+export const SPAWN = 0;
