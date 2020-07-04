@@ -29,6 +29,10 @@ export function actor(handlers, settings = {
     }
   }
 
+  handlers[settings.behavior.default].info = ({ reply, id, state, behavior }) => {
+    reply({ payload: { id, state, behavior } })
+  }
+
 
   handlers[settings.behavior.default].start = (message) => {
     if (typeof originalStart === "function") {
@@ -56,7 +60,8 @@ export function actor(handlers, settings = {
       id: `${nodeId}.${actorId}-${url}`,
       handlers,
       behavior,
-      links: []
+      links: [],
+      state: {}
     }),
   };
 }

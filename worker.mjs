@@ -82,7 +82,7 @@ class ActorsNode {
 
         if (message.type === REPLY || message.type === STARTED) {
             self.dispatchEvent(
-                new CustomEvent(RESUME + message.id, { detail: message.sender }),
+                new CustomEvent(RESUME + message.id, { detail: message }),
             );
         }
 
@@ -95,12 +95,14 @@ class ActorsNode {
             id: actor.id,
             messageId: message.id,
             links: actor.links,
+            state: actor.state,
+            behavior: actor.behavior.current,
             spawn: async (url, options = {}) =>
                 new Promise((resolve, reject) => {
                     const msgId = this.generateID();
 
                     self.addEventListener(RESUME + msgId, (e) =>
-                        resolve(e.detail), { once: true });
+                        resolve(e.detail.sender), { once: true });
                     this.send(
                         {
                             type: SPAWN,
@@ -158,6 +160,12 @@ class ActorsNode {
                         resolve(e.detail), { once: true });
                     this.send({ ...msg, sender: actor.id, id: message.id });
                 }),
+
+            info: async (pid) => new Promise((resolve, reject) => {
+                self.addEventListener(RESUME + message.id, (e) =>
+                    resolve(e.detail.payload), { once: true });
+                this.send({ type: 'info', receiver: pid, sender: actor.id, id: message.id });
+            }),
         };
 
         if (message.type in actor.handlers[behavior]) {

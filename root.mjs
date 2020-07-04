@@ -1,7 +1,7 @@
 import { actor } from "./actor.mjs";
 
 export default actor({
-  async start({ payload, tell, ask, ctx, spawn, id, link }) {
+  async start({ payload, tell, ask, ctx, spawn, id, link, info }) {
     console.log("ROOT:", "-------   Received?   ----------", payload, ctx);
 
     const echoId = await spawn("./echo.mjs");
@@ -20,6 +20,10 @@ export default actor({
     setTimeout(() => {
       tell({ type: 'terminate', receiver: echoId, sender: id, payload: 'some reason' })
     }, 1000)
+
+    const echoInfo = await info(echoId)
+
+    console.log('echo info', echoInfo)
 
     const response = await ask(
       { type: "ciao", receiver: echoId, payload: "hello" },
