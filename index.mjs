@@ -8,14 +8,11 @@ function WorkerPool(url, onMessage) {
   this.currentWorker = 0;
   this.workerList = [];
   /**
-       * 
-       * @param message {import("./types").Message}
-       * @param options {object}
-       */
+   * @param message {import("./types").Message}
+   * @param options {object}
+   */
   this.postMessage = (message, options = {}) => {
     if (options.workerId) {
-      // console.log('single', options.workerId, message)
-      // debugger
       this.workerList[options.workerId].instance.postMessage(message);
     } else {
       this.workerList[this.currentWorker].instance.postMessage(message);

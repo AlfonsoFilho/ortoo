@@ -18,5 +18,12 @@ export default actor({
       { type: "ciao", receiver: echoId, payload: "hello" },
     );
     console.log("respose", response);
+
+    const actorWithBehaviourID = await spawn('./actor-with-behaviour.mjs')
+    console.log('actorWithBehaviourID', actorWithBehaviourID)
+    tell({ type: 'ping', payload: 'test 1', receiver: actorWithBehaviourID })
+    tell({ type: 'ping', payload: 'test 2', receiver: actorWithBehaviourID })
+    tell({ type: 'rollback', payload: 'undo behaviour', receiver: actorWithBehaviourID })
+    tell({ type: 'ping', payload: 'test 3', receiver: actorWithBehaviourID })
   },
 });

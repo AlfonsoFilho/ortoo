@@ -40,19 +40,10 @@ export function actor(handlers, settings = {
   };
 
   return {
-    spawn: (nodeId, actorId, url) =>
-      Object.create(null, {
-        id: { value: `${nodeId}.${actorId}-${url}` },
-
-        handlers: {
-          value: handlers,
-        },
-        mailbox: {
-          value: [],
-        },
-        behavior: {
-          value: behavior,
-        },
-      }),
+    spawn: (nodeId, actorId, url) => ({
+      id: `${nodeId}.${actorId}-${url}`,
+      handlers,
+      behavior
+    })
   };
 }
