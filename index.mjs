@@ -1,29 +1,30 @@
 
+import { SPAWN } from './constants.mjs'
 
+// async function spawn(actorSystem, modPath) {
+//     const url = new URL(modPath, location.origin)
+//     const actorDefinition = await import(url.href).then(mod => mod.default)
 
-async function spawn(actorSystem, modPath) {
-    const url = new URL(modPath, location.origin)
-    const actorDefinition = await import(url.href).then(mod => mod.default)
+//     const id = Math.random().toString(36).substr(2, 9);
+//     actorSystem.actors[id] = Object.assign(actorDefinition, { id, url: url.href });
 
-    const id = Math.random().toString(36).substr(2, 9);
-    actorSystem.actors[id] = Object.assign(actorDefinition, { id, url: url.href });
+//     return id
+// }
 
-    return id
-}
+// function tell(receiver, sender, type, message) {
+//     const msg = {
+//         sender,
+//         receiver,
+//         type,
+//         message,
+//     };
 
-function tell(receiver, sender, type, message) {
-    const msg = {
-        sender,
-        receiver,
-        type,
-        message,
-    };
-
-    globalThis.dispatchEvent(new CustomEvent("actor:message", { detail: msg }));
-}
+//     globalThis.dispatchEvent(new CustomEvent("actor:message", { detail: msg }));
+// }
 
 
 function WorkerPool(url, onMessage) {
+    const { href } = new URL(url, location.origin)
     this.maxWorkers = navigator.hardwareConcurrency;
     this.currentWorker = 0
     this.workerList = [];
@@ -33,7 +34,7 @@ function WorkerPool(url, onMessage) {
     }
 
     for (let i = 0; i <= this.maxWorkers; i++) {
-        this.workerList[i] = new Worker(url, { name: i, type: 'module' });
+        this.workerList[i] = new Worker(href, { name: i, type: 'module' });
         this.workerList[i].onmessage = onMessage
     }
 }
@@ -42,52 +43,35 @@ function WorkerPool(url, onMessage) {
 function ActorSystem(settings) {
 
 
-    const onMessageFromWorker = async (e) => {
-
-        switch (e.data.cmd) {
-            case 'spawn':
-                // console.log('spawn', e.data)
-                const id = await spawn(this, e.data.actor.url)
-                console.log('spawnder', e.data, id)
-                break;
-
-            default:
-                console.log('message from worker pool', e.data)
-                break;
-        }
-    }
-
-    const workerUrl = new URL('./worker.mjs', location.origin)
-    // const pool = new WorkerPool(createWorkerCode(settings.actors), function onMessageFromWorker(e) {
-    const pool = new WorkerPool(workerUrl.href, onMessageFromWorker)
-
-    this.actors = {};
+    const pool = new WorkerPool('./worker.mjs', async (e) => {
+        console.log('main thread receive', e)
+    })
 
     if (settings.root) {
-        spawn(this, settings.root);
+        pool.postMessage({ cmd: SPAWN, url: settings.root })
     }
 
-    globalThis.addEventListener("actor:message", ({ detail }) => {
-        // console.log("on messaage", detail, this.actors);
+    // globalThis.addEventListener("actor:message", ({ detail }) => {
+    //     // console.log("on messaage", detail, this.actors);
 
-        if (detail.receiver in this.actors) {
-            const actor = this.actors[detail.receiver]
-            const workerMessage = {
-                url: actor.url,
-                id: actor.id,
-                behavior: actor.behavior.current,
-                type: detail.type,
-                msg: detail
-            }
-            pool.postMessage(workerMessage)
-            // this.actors[detail.receiver].handlers[this.actors[detail.receiver].behavior.current][detail.type]({
-            //     message: detail.message,
-            //     sender: detail.sender,
-            //     spawn: (actorDefinition) => spawn(this, actorDefinition),
-            //     tell: (id, type, message) => tell(id, detail.sender, type, message)
-            // });
-        }
-    });
+    //     if (detail.receiver in this.actors) {
+    //         const actor = this.actors[detail.receiver]
+    //         const workerMessage = {
+    //             url: actor.url,
+    //             id: actor.id,
+    //             behavior: actor.behavior.current,
+    //             type: detail.type,
+    //             msg: detail
+    //         }
+    //         pool.postMessage(workerMessage)
+    //         // this.actors[detail.receiver].handlers[this.actors[detail.receiver].behavior.current][detail.type]({
+    //         //     message: detail.message,
+    //         //     sender: detail.sender,
+    //         //     spawn: (actorDefinition) => spawn(this, actorDefinition),
+    //         //     tell: (id, type, message) => tell(id, detail.sender, type, message)
+    //         // });
+    //     }
+    // });
 
 
 
@@ -153,4 +137,10 @@ Support:
 Node
 Deno
 Browser
+
+
+
+
+
+
 */

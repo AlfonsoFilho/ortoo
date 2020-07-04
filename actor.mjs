@@ -1,33 +1,41 @@
 
-
 const DEFAULT = 'DEFAULT'
 
-export function actor(handlers, {
-    default_behaviour = DEFAULT
-} = {}) {
+/**
+ * @type {import('./types').ActorBuilder}
+ */
+export function actor(handlers, settings = {
+    behavior: {
+        default: DEFAULT
+    }
+}) {
 
-    if (!Reflect.has(handlers, default_behaviour)) {
+    if (!Reflect.has(handlers, settings.behavior.default)) {
         handlers = {
-            [default_behaviour]: handlers
+            [settings.behavior.default]: handlers
         }
     }
 
-    return Object.create(null, {
-        // id: {
-        //     value: Symbol.for(Math.random().toString(36).substr(2, 9)),
-        //     writable: false,
-        // },
-        handlers: {
-            value: handlers,
-            writable: false
-        },
-        // mailbox: {
-        //     value: []
-        // },
-        behavior: {
-            value: {
-                current: DEFAULT
+    const behavior = {
+        history: [],
+        current: settings.behavior.default,
+        default: settings.behavior.default
+    }
+
+
+    return {
+        spawn: (nodeId, actorId) => Object.create(null, {
+            id: { value: `${nodeId}.${actorId}` },
+
+            handlers: {
+                value: handlers,
             },
-        }
-    });
+            mailbox: {
+                value: []
+            },
+            behavior: {
+                value: behavior
+            }
+        })
+    }
 }
