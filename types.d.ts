@@ -6,7 +6,12 @@ export interface Address {
 type NodeID = number;
 type ActorID = number;
 
-interface Message {}
+export interface Message {
+  sender: string;
+  receiver: string;
+  type: string | number;
+  payload: any;
+}
 
 type MessageHandler = ({ state: object }) => object;
 
@@ -52,7 +57,7 @@ export type Actor = {
 
 export type ActorBuilder = (
   handlers: object,
-  settings: ActorSettings,
+  settings: ActorSettings
 ) => {
   spawn: (id: number) => Actor;
 };

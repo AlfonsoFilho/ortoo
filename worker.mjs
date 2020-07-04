@@ -1,118 +1,110 @@
 import { SPAWN } from "./constants.mjs";
+import { CONTEXT_SET } from "./constants.mjs";
+import { SYSTEM } from "./constants.mjs";
+import { STARTED } from "./constants.mjs";
+
+/**
+ * @typedef {import("./types").Message} Message
+ */
 
 class ActorsNode {
-  #autoIncrement = 0;
 
-  constructor() {
-    // this.#autoIncrement = 0;
-    this.actors = {};
-  }
-
-  /**
-     * @param url {string}
-     */
-  async spawn(url) {
-    const actorDef = await import(url).then((mod) => mod.default);
-    const actor = actorDef.spawn(self.name, ++this.#autoIncrement);
-
-    this.actors[actor.id] = actor;
-
-    console.log("spawn: ", this.actors);
-    this.tell(
-      {
-        type: "start",
-        receipt: actor.id,
-        sender: actor.id,
-        message: "spawining",
-      },
-    );
-  }
-
-  tell({ type, receipt, sender, message }) {
-    if (receipt[0] === self.name) {
-      console.log("local");
-      this.post({ type, receipt, sender, message });
-    } else {
-      postMessage({ type, receipt, sender, message });
+    constructor() {
+        this.autoIncrement = 0;
+        this.actors = {};
+        this.ctx = {};
     }
-    // self.dispatchEvent(new CustomEvent('thespis:post', { detail: data }))
-  }
 
-  post({ type, receipt, sender, message }) {
-    const actor = this.actors[receipt];
-    const behavior = actor.behavior.current;
-    actor.handlers[behavior][type](
-      {
-        type,
-        receipt,
-        sender,
-        message,
-        tell: (msg) => this.tell({ ...msg, sender: actor.id }),
-      },
-    );
-  }
+    /**
+       * @param url {string}
+       */
+    async spawn(url, message) {
+        const actorDef = await import(url).then((mod) => mod.default);
+        const actor = actorDef.spawn(self.name, ++this.autoIncrement, url);
+
+        this.actors[actor.id] = actor;
+
+        this.send(
+            {
+                type: "start",
+                receiver: actor.id,
+                sender: message.sender,
+                payload: "spawining",
+            },
+        );
+    }
+
+    /**
+     * @param message {Message}
+     */
+    send(message) {
+        if (message.receiver && message.receiver[0] === self.name) {
+            this.readAndAct(message);
+        } else {
+            postMessage(message);
+        }
+    }
+
+    setContext(ctx) {
+        this.ctx = ctx
+    }
+
+    /**
+     * @param message {Message}
+     */
+    readAndAct(message) {
+        const actor = this.actors[message.receiver];
+        const behavior = actor.behavior.current;
+
+        if (message.type === STARTED) {
+            self.dispatchEvent(new CustomEvent('::resume', { detail: message.sender }))
+        }
+
+        if (message.type in actor.handlers[behavior]) {
+            actor.handlers[behavior][message.type](
+                {
+                    type: message.type,
+                    receiver: message.receiver,
+                    sender: message.sender,
+                    payload: message.payload,
+                    ctx: this.ctx,
+                    id: actor.id, //???
+                    spawn: async (url, options = {}) => new Promise((resolve, reject) => {
+                        self.addEventListener('::resume', (e) => resolve(e.detail), { once: true });
+                        this.send({ type: SPAWN, receiver: SYSTEM, sender: actor.id, payload: { url } })
+                    }),
+                    link: () => { },
+                    become: () => { },
+                    unbecome: () => { },
+                    tell: (msg) => {
+                        this.send({ ...msg, sender: actor.id })
+                    },
+                    ask: () => { },
+                },
+            );
+        }
+    }
 }
 
 const node = new ActorsNode();
 
 onmessage = async ({ data }) => {
-  console.log("worker " + self.name, data);
 
-  switch (data.cmd) {
-    case SPAWN:
-      node.spawn(data.url);
-      break;
+    switch (data.type) {
+        case SPAWN: {
+            node.spawn(data.payload.url, data);
+            break;
+        }
 
-    default:
-      break;
-  }
+        case CONTEXT_SET: {
+            node.setContext(data.payload)
+            break;
+        }
+
+        case STARTED:
+        default: {
+            node.send(data)
+            break;
+        }
+    }
 };
-
-// const handlers = {
-
-// }
-
-// onmessage = async function onMessageHandler(e) {
-//     console.log('from worker', this.name, e.data)
-//     // debugger
-
-//     const { id, behavior, type, url } = e.data
-
-//     handlers[id] = await import(url).then(mod => mod.default.handlers)
-//     // const a = await importScripts(e.data.url)
-//     console.log('imported?', handlers)
-
-//     const result = await handlers[id][behavior][type]({
-//         message: e.data.message,
-//         spawn: (url, options) => {
-
-//             return new Promise((resolve, reject) => {
-//                 postMessage({ cmd: 'spawn', actor: { url } })
-
-//                 setTimeout(() => reject('nothing'), 1000)
-//             })
-
-//             // self.addEventListener('test', e => console.log('test', e), { once: true })
-
-//             // self.dispatchEvent(new CustomEvent('test', { detail: url }))
-//             // // return new Promise
-//             // return import(url)
-//             //     .then(mod => mod.default)
-//             //     .then(actor => {
-//             //         self.onmessage
-//             //         debugger
-//             //         postMessage({
-//             //             cmd: 'spawn', actor: {
-
-//             //             }
-//             //         })
-//             //         return actor
-//             //     })
-
-//         }
-//     })
-
-//     console.log(result)
-
-//     postMessage({ id: this.name, data: result })
-// }

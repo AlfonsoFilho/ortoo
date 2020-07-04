@@ -1,3 +1,5 @@
+import { STARTED } from './constants.mjs';
+
 const DEFAULT = "DEFAULT";
 
 /**
@@ -14,6 +16,17 @@ export function actor(handlers, settings = {
     };
   }
 
+  const originalStart = handlers[settings.behavior.default].start
+
+  handlers[settings.behavior.default].start = (message) => {
+
+    if (typeof originalStart === 'function') {
+      originalStart(message)
+    }
+
+    message.tell({ type: STARTED, receiver: message.sender, sender: message.id })
+  }
+
   const behavior = {
     history: [],
     current: settings.behavior.default,
@@ -21,9 +34,9 @@ export function actor(handlers, settings = {
   };
 
   return {
-    spawn: (nodeId, actorId) =>
+    spawn: (nodeId, actorId, url) =>
       Object.create(null, {
-        id: { value: `${nodeId}.${actorId}` },
+        id: { value: `${nodeId}.${actorId}-${url}` },
 
         handlers: {
           value: handlers,
