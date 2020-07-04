@@ -30,7 +30,7 @@ interface Handlers {
 interface ActorSettings {
   behavior: {
     default: string;
-    discard: boolean;
+    // discard: boolean;
   };
   keepAlive: boolean;
   trapExit: boolean;
@@ -48,7 +48,7 @@ export type Actor = {
     default: string; // do we need it?
   };
   config: {
-    discardBehavior: boolean;
+    // discardBehavior: boolean;
     discardLetters: boolean;
     timeout: number;
     keepAlive: boolean;

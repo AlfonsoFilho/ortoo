@@ -58,7 +58,6 @@ function ActorSystem(settings) {
       }
     } else {
       const [workerId, ..._] = message.receiver;
-      // console.log('??', workerId)
       pool.postMessage(message, { workerId });
     }
   });
@@ -103,6 +102,7 @@ Messages:
 - restart
 - died
 - info
+- unknown
 
 Components
 - Actor

@@ -13,4 +13,9 @@ export default actor({
   ciao({ reply, sender, payload }) {
     reply({ receiver: sender, payload: payload + " world", type: "REPLY" });
   },
+
+  unknown(msg) {
+    console.log('unknown message', msg)
+  }
+
 });

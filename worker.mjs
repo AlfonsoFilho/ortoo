@@ -92,66 +92,70 @@ class ActorsNode {
             );
         }
 
-        if (message.type in actor.handlers[behavior]) {
-            actor.handlers[behavior][message.type](
-                {
-                    type: message.type,
-                    receiver: message.receiver,
-                    sender: message.sender,
-                    payload: message.payload,
-                    ctx: this.ctx,
-                    id: actor.id,
-                    messageId: message.id,
-                    spawn: async (url, options = {}) =>
-                        new Promise((resolve, reject) => {
-                            const msgId = this.generateID();
+        const params = {
+            type: message.type,
+            receiver: message.receiver,
+            sender: message.sender,
+            payload: message.payload,
+            ctx: this.ctx,
+            id: actor.id,
+            messageId: message.id,
+            spawn: async (url, options = {}) =>
+                new Promise((resolve, reject) => {
+                    const msgId = this.generateID();
 
-                            self.addEventListener(RESUME + msgId, (e) =>
-                                resolve(e.detail), { once: true });
-                            this.send(
-                                {
-                                    type: SPAWN,
-                                    receiver: SYSTEM,
-                                    sender: actor.id,
-                                    payload: { url },
-                                    id: msgId,
-                                },
-                            );
-                        }),
-                    link: () => { },
-                    become: (behavior) => {
-                        actor.behavior.history.push(actor.behavior.current)
-                        actor.behavior.current = behavior
+                    self.addEventListener(RESUME + msgId, (e) =>
+                        resolve(e.detail), { once: true });
+                    this.send(
+                        {
+                            type: SPAWN,
+                            receiver: SYSTEM,
+                            sender: actor.id,
+                            payload: { url },
+                            id: msgId,
+                        },
+                    );
+                }),
+            link: () => { },
+            become: (behavior) => {
+                actor.behavior.history.push(actor.behavior.current)
+                actor.behavior.current = behavior
+            },
+            unbecome: () => {
+                if (actor.behavior.history.length > 0) {
+                    actor.behavior.current = actor.behavior.history.pop()
+                } else {
+                    actor.behavior.current = actor.behavior.default
+                }
+            },
+            tell: (msg) => {
+                this.send({ ...msg, sender: actor.id });
+            },
+            reply: (msg) => {
+                this.send(
+                    {
+                        ...msg,
+                        type: REPLY,
+                        sender: actor.id,
+                        receiver: message.sender,
+                        id: message.id,
                     },
-                    unbecome: () => {
-                        if (actor.behavior.history.length > 0) {
-                            actor.behavior.current = actor.behavior.history.pop()
-                        } else {
-                            actor.behavior.current = actor.behavior.default
-                        }
-                    },
-                    tell: (msg) => {
-                        this.send({ ...msg, sender: actor.id });
-                    },
-                    reply: (msg) => {
-                        this.send(
-                            {
-                                ...msg,
-                                type: REPLY,
-                                sender: actor.id,
-                                receiver: message.sender,
-                                id: message.id,
-                            },
-                        );
-                    },
-                    ask: async (msg) =>
-                        new Promise((resolve, reject) => {
-                            self.addEventListener(RESUME + message.id, (e) =>
-                                resolve(e.detail), { once: true });
-                            this.send({ ...msg, sender: actor.id, id: message.id });
-                        }),
-                },
-            );
+                );
+            },
+            ask: async (msg) =>
+                new Promise((resolve, reject) => {
+                    self.addEventListener(RESUME + message.id, (e) =>
+                        resolve(e.detail), { once: true });
+                    this.send({ ...msg, sender: actor.id, id: message.id });
+                }),
+        }
+
+        if (message.type in actor.handlers[behavior]) {
+            actor.handlers[behavior][message.type](params);
+        } else {
+            if (typeof actor.handlers[behavior].unknown === 'function') {
+                actor.handlers[behavior].unknown(params)
+            }
         }
     }
 }
