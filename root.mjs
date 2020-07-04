@@ -1,7 +1,7 @@
 import { actor } from "./actor.mjs";
 
 export default actor({
-  async start({ payload, tell, ask, ctx, spawn, id }) {
+  async start({ payload, tell, ask, ctx, spawn, id, link }) {
     console.log("ROOT:", "-------   Received?   ----------", payload, ctx);
 
     const echoId = await spawn("./echo.mjs");
@@ -14,6 +14,13 @@ export default actor({
         payload: "print this for me please!",
       },
     );
+
+    const hasLink = await link(echoId)
+
+    setTimeout(() => {
+      tell({ type: 'terminate', receiver: echoId, sender: id, payload: 'some reason' })
+    }, 1000)
+
     const response = await ask(
       { type: "ciao", receiver: echoId, payload: "hello" },
     );
@@ -34,4 +41,7 @@ export default actor({
     );
     tell({ type: "ping", payload: "test 3", receiver: actorWithBehaviourID });
   },
+  unknown({ type, payload }) {
+    console.log('root unknow messages', type, payload)
+  }
 });

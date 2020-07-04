@@ -18,6 +18,18 @@ export function actor(handlers, settings = {
 
   const originalStart = handlers[settings.behavior.default].start;
 
+  handlers[settings.behavior.default].link = ({ links, sender, reply }) => {
+    links.push(sender)
+    reply({})
+  }
+
+  handlers[settings.behavior.default].terminate = ({ links, tell, payload }) => {
+    for (const link of links) {
+      tell({ type: 'DOWN', receiver: link, payload })
+    }
+  }
+
+
   handlers[settings.behavior.default].start = (message) => {
     if (typeof originalStart === "function") {
       originalStart(message);
@@ -44,6 +56,7 @@ export function actor(handlers, settings = {
       id: `${nodeId}.${actorId}-${url}`,
       handlers,
       behavior,
+      links: []
     }),
   };
 }
