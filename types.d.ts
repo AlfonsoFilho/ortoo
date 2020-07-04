@@ -59,11 +59,15 @@ export type Actor = {
   links: [];
   state: any;
   label: string;
+  cron: {
+    interval: number;
+    message: Message;
+  };
 };
 
 export type ActorBuilder = (
   handlers: object,
-  settings: ActorSettings,
+  settings: ActorSettings
 ) => {
   spawn: (id: number) => Actor;
 };
