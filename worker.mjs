@@ -10,6 +10,7 @@ import {
   SYSTEM,
   STARTED,
   RESUME,
+  BEHAVIOR_HISTORY_LIMIT,
 } from "./constants.mjs";
 
 class ActorsNode {
@@ -20,10 +21,10 @@ class ActorsNode {
   }
 
   /**
-         * @param {string} url
-         * @param {Message} message
-         * @returns { Promise<void> }
-         */
+           * @param {string} url
+           * @param {Message} message
+           * @returns { Promise<void> }
+           */
   async spawn(url, message) {
     const actorDef = await import(url).then((mod) => mod.default);
     const actor = actorDef.spawn(self.name, ++this.autoIncrement, url);
@@ -42,15 +43,15 @@ class ActorsNode {
   }
 
   /**
-         * @returns {string}
-         */
+           * @returns {string}
+           */
   generateID() {
     return Math.random().toString(32).substring(2, 12);
   }
 
   /**
-         * @param {Message} message
-         */
+           * @param {Message} message
+           */
   send(message) {
     if (!message.id) {
       message.id = this.generateID();
@@ -72,15 +73,15 @@ class ActorsNode {
   }
 
   /**
-         * @param { Context } ctx - System context
-         */
+           * @param { Context } ctx - System context
+           */
   setContext(ctx) {
     this.ctx = ctx;
   }
 
   /**
-         * @param {Message} message
-         */
+           * @param {Message} message
+           */
   readAndAct(message) {
     /** @type {import("./types").Actor} */
     const actor = this.actors[message.receiver];
