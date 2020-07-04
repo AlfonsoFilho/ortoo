@@ -1,4 +1,4 @@
-import { STARTED } from './constants.mjs';
+import { STARTED } from "./constants.mjs";
 
 const DEFAULT = "DEFAULT";
 
@@ -16,16 +16,17 @@ export function actor(handlers, settings = {
     };
   }
 
-  const originalStart = handlers[settings.behavior.default].start
+  const originalStart = handlers[settings.behavior.default].start;
 
   handlers[settings.behavior.default].start = (message) => {
-
-    if (typeof originalStart === 'function') {
-      originalStart(message)
+    if (typeof originalStart === "function") {
+      originalStart(message);
     }
 
-    message.tell({ type: STARTED, receiver: message.sender, sender: message.id })
-  }
+    message.tell(
+      { type: STARTED, receiver: message.sender, sender: message.id },
+    );
+  };
 
   const behavior = {
     history: [],
