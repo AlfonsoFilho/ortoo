@@ -15,7 +15,6 @@ export default actor({
   },
 
   unknown(msg) {
-    console.log('unknown message', msg)
-  }
-
+    console.log("unknown message", msg);
+  },
 });

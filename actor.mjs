@@ -43,7 +43,7 @@ export function actor(handlers, settings = {
     spawn: (nodeId, actorId, url) => ({
       id: `${nodeId}.${actorId}-${url}`,
       handlers,
-      behavior
-    })
+      behavior,
+    }),
   };
 }

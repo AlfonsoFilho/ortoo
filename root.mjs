@@ -19,13 +19,19 @@ export default actor({
     );
     console.log("respose", response);
 
-    tell({ type: 'wrong', receiver: echoId, payload: 'test' })
+    tell({ type: "wrong", receiver: echoId, payload: "test" });
 
-    const actorWithBehaviourID = await spawn('./actor-with-behaviour.mjs')
-    console.log('actorWithBehaviourID', actorWithBehaviourID)
-    tell({ type: 'ping', payload: 'test 1', receiver: actorWithBehaviourID })
-    tell({ type: 'ping', payload: 'test 2', receiver: actorWithBehaviourID })
-    tell({ type: 'rollback', payload: 'undo behaviour', receiver: actorWithBehaviourID })
-    tell({ type: 'ping', payload: 'test 3', receiver: actorWithBehaviourID })
+    const actorWithBehaviourID = await spawn("./actor-with-behaviour.mjs");
+    console.log("actorWithBehaviourID", actorWithBehaviourID);
+    tell({ type: "ping", payload: "test 1", receiver: actorWithBehaviourID });
+    tell({ type: "ping", payload: "test 2", receiver: actorWithBehaviourID });
+    tell(
+      {
+        type: "rollback",
+        payload: "undo behaviour",
+        receiver: actorWithBehaviourID,
+      },
+    );
+    tell({ type: "ping", payload: "test 3", receiver: actorWithBehaviourID });
   },
 });
