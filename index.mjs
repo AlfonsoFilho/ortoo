@@ -79,7 +79,7 @@ function ActorSystem(settings) {
   }
 }
 
-const myApp = new ActorSystem({
+const myApp = ActorSystem({
   root: "./root.mjs",
   debug: true,
 });

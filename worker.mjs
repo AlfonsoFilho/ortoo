@@ -14,6 +14,8 @@ import {
     LINK
 } from "./constants.mjs";
 
+// import functionReflector from './node_modules/js-function-reflector/index';
+
 class ActorsNode {
     constructor() {
         this.autoIncrement = 0;
@@ -97,6 +99,22 @@ class ActorsNode {
             links: actor.links,
             state: actor.state,
             behavior: actor.behavior.current,
+            spawnCode: async (fn) => {
+
+                const parse = (code) => {
+                    const codeStr = code.toString()
+
+                    return codeStr.split('=>')[1]
+                }
+
+                console.log('fn ', parse(fn))
+
+
+                // console.log('fn reflect', functionReflector(fn.toString()))
+                const compiled = new Function('t', parse(fn))
+                console.log('compiled?', compiled)
+                compiled({ testing: true })
+            },
             spawn: async (url, options = {}) =>
                 new Promise((resolve, reject) => {
                     const msgId = this.generateID();
