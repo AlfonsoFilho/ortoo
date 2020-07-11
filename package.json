@@ -2,9 +2,22 @@
   "name": "ortoo",
   "version": "0.0.1",
   "description": "Actor Model library for JavaScript environments",
-  "main": "index.js",
+  "source": "lib/ortoo.ts",
+  "main": "dist/ortoo.js",
+  "module": "dist/ortoo.module.js",
+  "unpkg": "dist/ortoo.umd.js",
+  "mangle": {
+    "regex": "^_",
+    "reserved": [
+      "workerCode"
+    ]
+  },
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "microbundle",
+    "dev": "microbundle watch",
+    "fmt": "npx prettier --write ."
   },
   "repository": {
     "type": "git",
@@ -19,5 +32,10 @@
     "url": "https://github.com/AlfonsoFilho/ortoo/issues"
   },
   "homepage": "https://github.com/AlfonsoFilho/ortoo#readme",
-  "devDependencies": {}
+  "devDependencies": {
+    "ava": "3.10.1",
+    "microbundle": "0.12.2",
+    "prettier": "2.0.5",
+    "typescript": "3.9.6"
+  }
 }
