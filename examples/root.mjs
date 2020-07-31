@@ -4,18 +4,21 @@
 //   }
 // }
 
-
-
 export default {
   // async start({ payload, tell, ask, ctx, spawn, id, link, info, spawnCode }) {
   async start(tell) {
-    console.log("ROOT:", "-------   Received?   ----------", message, ctx, tell);
+    console.log(
+      "ROOT:",
+      "-------   Received?   ----------",
+      message,
+      ctx,
+      tell
+    );
 
     // tell({ payload: 'TEST ?', receiver: 'SYSTEM' })
 
     const echoId = await spawn("./echo.mjs");
     console.log("ROOT: echoId", echoId);
-
 
     tell({
       type: "print",

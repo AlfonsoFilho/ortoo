@@ -4,9 +4,9 @@ console.log("ORTOO!!");
 
 const rootActor = {
   start() {
-    console.log('root actor start')
-  }
-}
+    console.log("root actor start");
+  },
+};
 
 Ortoo({
   root: "/examples/root.mjs",
