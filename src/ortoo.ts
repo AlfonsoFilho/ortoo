@@ -3,6 +3,11 @@ import { worker } from "./worker";
 import { Message } from "./types";
 import { SYSTEM, SPAWN } from "./constants";
 
+// TODO: timeout
+// TODO: extend actor
+// TODO: agent actor
+// TODO: main thread actor
+
 interface Settings {
   root?: any;
   debug?: boolean;

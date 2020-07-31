@@ -2,7 +2,7 @@
   "name": "ortoo",
   "version": "0.0.1",
   "description": "Actor Model library for JavaScript environments",
-  "source": "lib/ortoo.ts",
+  "source": "src/ortoo.ts",
   "main": "dist/ortoo.js",
   "module": "dist/ortoo.module.js",
   "unpkg": "dist/ortoo.umd.js",
@@ -33,9 +33,9 @@
   },
   "homepage": "https://github.com/AlfonsoFilho/ortoo#readme",
   "devDependencies": {
-    "ava": "3.10.1",
-    "microbundle": "0.12.2",
+    "ava": "3.11.0",
+    "microbundle": "0.12.3",
     "prettier": "2.0.5",
-    "typescript": "3.9.6"
+    "typescript": "3.9.7"
   }
 }

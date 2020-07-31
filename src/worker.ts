@@ -1,4 +1,3 @@
-import { SPAWN, SETUP_WORKER, STARTED, DEFAULT } from "./constants";
 import { Message } from "./types";
 
 export function worker() {
@@ -62,14 +61,48 @@ export function worker() {
         // default: settings.behavior.default,
       };
 
-      Object.setPrototypeOf(handlers[DEFAULT], {
-        start(...a) {
-          console.log("start default handler ", id, a);
-        },
-        stop() {
-          console.log("stop default handler ", id);
-        },
-      });
+      // Object.setPrototypeOf(handlers[DEFAULT], {
+      //   start(...a) {
+      //     console.log("start default handler ", id, a);
+      //   },
+      //   stop() {
+      //     console.log("stop default handler ", id);
+      //   },
+      // });
+
+      const originalStart = handlers[DEFAULT].start;
+
+      handlers[DEFAULT].start = (...params) => {
+        if (typeof originalStart === "function") {
+          originalStart(...params);
+        }
+
+        /*
+             // Values
+          "message",
+          "id"
+          "ctx",
+          "links",
+          "state",
+          "behavior",
+          // Methods
+          "spawn",
+          "tell",
+          "ask",
+          "reply",
+          "become",
+          "unbecome",
+          "link",
+           */
+        const message = params[0];
+
+        params[7]({
+          type: STARTED,
+          receiver: message.sender,
+          sender: params[1],
+          id: message.id,
+        });
+      };
 
       return {
         id,
@@ -126,11 +159,12 @@ export function worker() {
     }
 
     private consume(message: Message) {
-      console.log("consume ", message);
+      console.log("consume ", self.name, message);
       const actor = this.actors[message.receiver as any];
       const behavior = actor.behavior.current;
 
       if (message.type === REPLY || message.type === STARTED) {
+        console.log("here?", self.name, RESUME + message.id, message);
         self.dispatchEvent(
           new CustomEvent(RESUME + message.id, { detail: message })
         );
@@ -163,12 +197,19 @@ export function worker() {
           actor.behavior.current,
           async (url: string, options = {}) =>
             new Promise((resolve, reject) => {
-              console.log("promise?", url);
               const msgId = this.generateId();
-
+              console.log(
+                "Added event listener",
+                self.name,
+                RESUME + msgId,
+                url
+              );
               self.addEventListener(
                 RESUME + msgId,
-                (e) => resolve(e.detail.sender),
+                (e) => {
+                  console.log("event!", e);
+                  resolve(e.detail.sender);
+                },
                 { once: true }
               );
 

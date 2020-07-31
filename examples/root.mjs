@@ -17,12 +17,12 @@ export default {
     console.log("ROOT: echoId", echoId);
 
 
-    // tell({
-    //   type: "print",
-    //   receiver: echoId,
-    //   sender: id,
-    //   payload: "print this for me please!",
-    // });
+    tell({
+      type: "print",
+      receiver: echoId,
+      sender: id,
+      payload: "print this for me please!",
+    });
 
     // const hasLink = await link(echoId);
 
