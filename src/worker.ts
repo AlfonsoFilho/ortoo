@@ -1,4 +1,5 @@
 import { Message } from "./types";
+import { deserialize } from "./utils";
 
 export function worker() {
   const SPAWN = "SPAWN";
@@ -16,44 +17,14 @@ export function worker() {
 
     constructor() {}
 
-    public deserialize(txt) {
-      const obj = JSON.parse(txt);
-      const AsyncFunction = Object.getPrototypeOf(async function () {})
-        .constructor;
-
-      for (const prop in obj) {
-        obj[prop] = new AsyncFunction(
-          // Values
-          "message",
-          "id",
-          "ctx",
-          "links",
-          "state",
-          "behavior",
-          // Methods
-          "spawn",
-          "tell",
-          "ask",
-          "reply",
-          "become",
-          "unbecome",
-          "link",
-          obj[prop]
-        );
-      }
-
-      return obj;
-    }
-
-    private createActor(handlers, url) {
-      debugger;
-      if (!Reflect.has(handlers, DEFAULT)) {
+    private createActor(handlers) {
+      if (!(DEFAULT in handlers)) {
         handlers = {
           [DEFAULT]: handlers,
         };
       }
 
-      const id = `${self.name}.${this.autoIncrement++}-${url}`;
+      const id = `${self.name}.${this.autoIncrement++}`;
 
       const behavior = {
         history: [],
@@ -113,9 +84,9 @@ export function worker() {
       };
     }
 
-    public async spawn(url, message) {
-      const handlers = this.deserialize(message.payload.code);
-      const actor = this.createActor(handlers, url);
+    public async spawn(message) {
+      const handlers = deserialize(message.payload);
+      const actor = this.createActor(handlers);
 
       this.actors[actor.id] = actor;
 
@@ -237,7 +208,8 @@ export function worker() {
     // console.log(`worker ${self.name} received:`, data);
     switch (data.type) {
       case SPAWN: {
-        node.spawn(data.payload.url, data);
+        console.log("?? data", data);
+        node.spawn(data);
         break;
       }
       case SETUP_WORKER: {

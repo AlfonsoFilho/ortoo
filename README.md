@@ -43,3 +43,35 @@ Support:
 Node
 Deno
 Browser
+
+```ts
+
+const minimalActor = {
+    async start() {
+
+    }
+}
+
+const completeActor = {
+  config: {
+    name: 'completeActor'
+    mainThread: true
+  },
+  extend: minimalActor, // ?
+  stateA: {
+    async ping() {},
+    async rollback() {}
+  }
+  stateB: {
+    async ping() {},
+    async rollback() {},
+    async after(5000) {}, // special handler for timeout
+    async catch() {}, // special handler to catch exceptions - do we need that?
+    async otherwise() {}, // special handler when no match
+  }
+
+};
+
+
+
+```
