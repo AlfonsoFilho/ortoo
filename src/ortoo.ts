@@ -13,12 +13,16 @@ const systemActor = {
   config: {
     mainThread: true,
   },
+  start() {
+    console.log("SYSTEM start!");
+    console.log("whoami", self);
+  },
   spawn() {},
 };
 
 export async function Ortoo(settings: Settings = {}) {
   const broker: Broker = (msg, workerPool) => {
-    console.log("MSG", msg);
+    // console.log("Broker msg log: ", msg);
 
     if (msg.receiver === SYSTEM) {
     }
@@ -62,15 +66,24 @@ export async function Ortoo(settings: Settings = {}) {
   //   }
   // });
 
+  // Create system actor
+  pool.postMessage({
+    type: SPAWN,
+    sender: "0.0",
+    payload: serialize(systemActor),
+    receiver: "0.0",
+  });
+
   if (settings.root) {
-    console.log("rott", settings.root);
+    // console.log("rott", settings.root);
     // const mod = await import(settings.root).then((mod) => mod.default);
 
     pool.postMessage({
       type: SPAWN,
-      sender: SYSTEM,
+      receiver: "*.*",
+      sender: "0.0",
       payload: serialize(settings.root),
-    } as any);
+    });
   }
 
   if (settings.debug) {

@@ -1,11 +1,11 @@
-import { InlineWorker, createWorkerPool } from "./worker-pool";
+import { createWorkerPool } from "./worker-pool";
 
 export interface Message {
   id?: string;
   sender: string;
   receiver: string;
   type: string | number;
-  payload: any;
+  payload?: any;
 }
 
 export interface Settings {

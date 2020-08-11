@@ -17,7 +17,7 @@ export function serialize(localMod) {
 
 export function deserialize(txt) {
   const { config = {}, ...obj } = JSON.parse(txt);
-  console.log("?", config, obj);
+  // console.log("?", config, obj);
   const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
   for (const prop in obj) {

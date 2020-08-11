@@ -1,7 +1,7 @@
 import { Message } from "./types";
 import { deserialize } from "./utils";
 
-export function worker() {
+export function worker(thread = self) {
   const SPAWN = "SPAWN";
   const SETUP_WORKER = "SETUP_WORKER";
   const STARTED = "STARTED";
@@ -24,7 +24,7 @@ export function worker() {
         };
       }
 
-      const id = `${self.name}.${this.autoIncrement++}`;
+      const id = `${thread.name}.${this.autoIncrement++}`;
 
       const behavior = {
         history: [],
@@ -85,12 +85,13 @@ export function worker() {
     }
 
     public async spawn(message) {
+      // console.log("spawn", message);
       const handlers = deserialize(message.payload);
       const actor = this.createActor(handlers);
 
       this.actors[actor.id] = actor;
 
-      console.log("actors", this.actors);
+      // console.log("actors", this.actors);
       this.send({
         type: "start",
         receiver: actor.id,
@@ -105,6 +106,8 @@ export function worker() {
     }
 
     public send(message: Message) {
+      // debugger;
+      // console.log("send?", message);
       if (!message.id) {
         message.id = this.generateId();
       }
@@ -113,10 +116,10 @@ export function worker() {
         throw new Error("Receiver missing");
       }
 
-      if (message.receiver[0] === self.name) {
+      if (message.receiver[0] === thread.name) {
         this.consume(message);
       } else {
-        self.postMessage(message);
+        thread.postMessage(message);
       }
     }
 
@@ -125,18 +128,19 @@ export function worker() {
     }
 
     private tell(actorId: string, message: Message) {
-      console.log({ ...message, sender: actorId });
+      // console.log({ ...message, sender: actorId });
       this.send({ ...message, sender: actorId });
     }
 
     private consume(message: Message) {
-      console.log("consume ", self.name, message);
+      // console.log("consume ", thread.name, message);
       const actor = this.actors[message.receiver as any];
       const behavior = actor.behavior.current;
 
       if (message.type === REPLY || message.type === STARTED) {
-        console.log("here?", self.name, RESUME + message.id, message);
-        self.dispatchEvent(
+        // console.log("here?", thread.name, RESUME + message.id, message);
+        // console.log("thread??", thread, thread.dispatchEvent);
+        thread.dispatchEvent(
           new CustomEvent(RESUME + message.id, { detail: message })
         );
       }
@@ -171,11 +175,11 @@ export function worker() {
               const msgId = this.generateId();
               console.log(
                 "Added event listener",
-                self.name,
+                thread.name,
                 RESUME + msgId,
                 url
               );
-              self.addEventListener(
+              thread.addEventListener(
                 RESUME + msgId,
                 (e) => {
                   console.log("event!", e);
@@ -204,11 +208,13 @@ export function worker() {
 
   const node = new ActorsNode();
 
-  self.onmessage = async ({ data }) => {
-    // console.log(`worker ${self.name} received:`, data);
+  thread.onmessage = async (ev) => {
+    // console.log("HERE 2 -> ", ev);
+    const { data } = ev;
+    // console.log(`worker ${thread.name} received:`, ev, data);
     switch (data.type) {
       case SPAWN: {
-        console.log("?? data", data);
+        // console.log("?? data", data);
         node.spawn(data);
         break;
       }
@@ -218,6 +224,7 @@ export function worker() {
       }
       case STARTED:
       default: {
+        console.log("sned??");
         node.send(data);
         break;
       }

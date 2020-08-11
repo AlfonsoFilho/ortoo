@@ -7,6 +7,7 @@ const rootActor = {
     name: 'test'
   },
   start() {
+    console.log("whoami", self);
     console.log("root actor start");
   },
 };
@@ -16,7 +17,7 @@ export const ortoo = Ortoo({
   debug: true,
 });
 
-console.log('Ortoo?', ortoo, window?.Ortoo)
+// console.log('Ortoo?', ortoo, window?.Ortoo)
 
 
 // --- OLD ---
