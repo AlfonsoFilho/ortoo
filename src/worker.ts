@@ -171,32 +171,15 @@ export function worker(thread = self) {
           actor.state,
           actor.behavior.current,
           /* spawn */ async (url: string, options = {}) =>
-            new Promise((resolve, reject) => {
-              const msgId = this.generateId();
-              console.log(
-                "Added event listener",
-                thread.name,
-                RESUME + msgId,
-                url
-              );
-              thread.addEventListener(
-                RESUME + msgId,
-                (e) => {
-                  console.log("event!", e);
-                  resolve(e.detail.sender);
-                },
-                { once: true }
-              );
-
-              this.send({
-                type: "spawn",
-                receiver: "0.0",
-                sender: actor.id,
-                payload: { code: url },
-                id: msgId,
-              });
+            futureMessage(this, {
+              type: "spawn",
+              receiver: "0.0",
+              sender: actor.id,
+              payload: { code: url },
             }),
+
           /* tell */ this.tell.bind(this, actor.id),
+
           /* ask */ (msg: Message) =>
             futureMessage(this, {
               ...msg,
