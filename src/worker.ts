@@ -85,13 +85,13 @@ export function worker(thread = self) {
     }
 
     public async spawn(message) {
-      // console.log("spawn", message);
+      console.log("spawn", message);
       const handlers = deserialize(message.payload);
       const actor = this.createActor(handlers);
 
       this.actors[actor.id] = actor;
 
-      // console.log("actors", this.actors);
+      console.log("actors", this.actors);
       this.send({
         type: "start",
         receiver: actor.id,
@@ -107,7 +107,7 @@ export function worker(thread = self) {
 
     public send(message: Message) {
       // debugger;
-      // console.log("send?", message);
+      console.log("send?", message, thread.name);
       if (!message.id) {
         message.id = this.generateId();
       }
@@ -123,7 +123,7 @@ export function worker(thread = self) {
       }
     }
 
-    private generateId() {
+    public generateId() {
       return Math.random().toString(32).substring(2, 12);
     }
 
@@ -170,7 +170,7 @@ export function worker(thread = self) {
           actor.links,
           actor.state,
           actor.behavior.current,
-          async (url: string, options = {}) =>
+          /* spawn */ async (url: string, options = {}) =>
             new Promise((resolve, reject) => {
               const msgId = this.generateId();
               console.log(
@@ -189,14 +189,19 @@ export function worker(thread = self) {
               );
 
               this.send({
-                type: SPAWN,
-                receiver: SYSTEM,
+                type: "spawn",
+                receiver: "0.0",
                 sender: actor.id,
-                payload: { url },
+                payload: { code: url },
                 id: msgId,
               });
             }),
-          this.tell.bind(this, actor.id)
+          /* tell */ this.tell.bind(this, actor.id),
+          /* ask */ (msg: Message) =>
+            futureMessage(this, {
+              ...msg,
+              sender: actor.id,
+            })
         );
       } else {
         if (typeof actor.handlers[behavior].unknown === "function") {
@@ -206,25 +211,35 @@ export function worker(thread = self) {
     }
   }
 
+  function futureMessage(_this: ActorsNode, msg: Message) {
+    return new Promise((resolve, reject) => {
+      const msgId = _this.generateId();
+
+      thread.addEventListener(
+        RESUME + msgId,
+        (e) => {
+          console.log("event!", e);
+          resolve(e.detail.sender);
+        },
+        { once: true }
+      );
+
+      _this.send({
+        ...msg,
+        id: msgId,
+      });
+    });
+  }
+
   const node = new ActorsNode();
 
-  thread.onmessage = async (ev) => {
-    // console.log("HERE 2 -> ", ev);
-    const { data } = ev;
-    // console.log(`worker ${thread.name} received:`, ev, data);
+  thread.onmessage = async ({ data }) => {
     switch (data.type) {
-      case SPAWN: {
-        // console.log("?? data", data);
+      case "SYSTEM_SPAWN": {
         node.spawn(data);
         break;
       }
-      case SETUP_WORKER: {
-        node.setContext(data.payload);
-        break;
-      }
-      case STARTED:
       default: {
-        console.log("sned??");
         node.send(data);
         break;
       }

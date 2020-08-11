@@ -4,7 +4,7 @@ export interface Message {
   id?: string;
   sender: string;
   receiver: string;
-  type: string | number;
+  type: string;
   payload?: any;
 }
 
@@ -13,16 +13,8 @@ export interface Settings {
   debug?: boolean;
 }
 
-// export interface IWorkerPool {
-//   maxWorkers: number;
-//   currentWorker: number;
-//   workerList: Record<string, InlineWorker>;
-//   postMessage?: (message: Message, options: PostMessageOptions) => void;
-// }
-
 export type WorkerPool = ReturnType<typeof createWorkerPool>;
 
-export type Broker = (msg: Message, workerPool: WorkerPool) => void;
 export interface WorkerPoolPostMessageOptions {
   workerId?: string;
 }

@@ -4,7 +4,7 @@ export function getMaxThreads() {
 
 export function serialize(localMod) {
   return JSON.stringify(localMod, (k, v) => {
-    if (k === "start") {
+    if (typeof v === "function") {
       const code = v.toString();
       return code
         .replace(/\/\*[\s\S]*?\*\/|[\s\t]+\/\/.*/g, "")

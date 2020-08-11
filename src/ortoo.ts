@@ -1,7 +1,6 @@
 import { createWorkerPool } from "./worker-pool";
 import { worker } from "./worker";
-import { Settings, Broker } from "./types";
-import { SYSTEM, SPAWN } from "./constants";
+import { Settings } from "./types";
 import { serialize } from "./utils";
 
 // TODO: timeout
@@ -9,95 +8,67 @@ import { serialize } from "./utils";
 // TODO: agent actor
 // TODO: main thread actor
 
-const systemActor = {
-  config: {
-    mainThread: true,
-  },
-  start() {
-    console.log("SYSTEM start!");
-    console.log("whoami", self);
-  },
-  spawn() {},
-};
-
 export async function Ortoo(settings: Settings = {}) {
-  const broker: Broker = (msg, workerPool) => {
-    // console.log("Broker msg log: ", msg);
-
-    if (msg.receiver === SYSTEM) {
-    }
-  };
-
   // 1. create worker pool
-  const pool = createWorkerPool(worker, broker);
+  const pool = createWorkerPool(worker);
 
   // 2. create system actor (main thread)
+  const systemActor = {
+    config: {
+      mainThread: true,
+    },
+    start() {
+      console.log("SYSTEM start!!!!");
+      console.log("whoami", self);
+    },
+    async spawn() {
+      // console.log("MAX", pool.maxWorkers);
+      // @ts-ignore
+      console.log("asking system to spawn", message);
+      // @ts-ignore
+      const id = await ask({
+        receiver: "1.0",
+        type: "SYSTEM_SPAWN",
+        sender: "0.0",
+        // @ts-ignore
+        payload: message.payload,
+      });
+      console.log("id", id);
+    },
+  };
 
-  // 3. create root actor (worker thread)
-
-  // const _pool: IWorkerPool = new WorkerPool(worker, async (e: MessageEvent) => {
-  //   const message: Message = e.data;
-
-  //   if (message.receiver === SYSTEM) {
-  //     switch (message.type) {
-  //       case SPAWN: {
-  //         const mod = await import(location.href + message.payload.url).then(
-  //           (mod) => mod.default
-  //         );
-
-  //         console.log("SPAWN again?", message, mod);
-
-  //         pool.postMessage({
-  //           ...message,
-  //           // sender: "SYSTEM",
-  //           // receiver: "*",
-  //           payload: { ...message.payload, code: serialize(mod) },
-  //         });
-  //         break;
-  //       }
-  //     }
-  //   } else {
-  //     const [workerId, ..._] = message.receiver ?? "";
-  //     if (workerId in pool.workerList) {
-  //       pool.postMessage(message, { workerId });
-  //     } else {
-  //       throw new Error(`Worker ${workerId} doesn't exist`);
-  //     }
-  //   }
-  // });
-
-  // Create system actor
   pool.postMessage({
-    type: SPAWN,
+    type: "SYSTEM_SPAWN",
     sender: "0.0",
     payload: serialize(systemActor),
     receiver: "0.0",
   });
 
+  // 3. create root actor (worker thread)
   if (settings.root) {
     // console.log("rott", settings.root);
     // const mod = await import(settings.root).then((mod) => mod.default);
 
     pool.postMessage({
-      type: SPAWN,
-      receiver: "*.*",
+      type: "spawn",
+      receiver: "0.0",
       sender: "0.0",
       payload: serialize(settings.root),
     });
   }
 
-  if (settings.debug) {
-    globalThis.Ortoo = {
-      version: 1,
-      about: () => {
-        console.table({
-          agent: navigator.userAgent,
-          workers: pool.maxWorkers,
-        });
-      },
-      // getActors: ()
-    };
-  }
+  // if (settings.debug) {
+  //   globalThis.Ortoo = {
+  //     version: 1,
+  //     about: () => {
+  //       console.table({
+  //         agent: navigator.userAgent,
+  //         workers: pool.maxWorkers,
+  //       });
+  //     },
+  //     // getActors: ()
+  //   };
+  // }
 }
 
 // export class Ortoo {

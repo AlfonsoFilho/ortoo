@@ -2,12 +2,14 @@ export class MainThread implements AbstractWorker {
   private worker = {
     name: "0",
     postMessage: (msg) => {
-      this.onmessage(msg);
+      this.onmessage({ data: msg });
     },
     dispatchEvent: (ev) => {
       globalThis.dispatchEvent(ev);
     },
-    addEventListener: globalThis.addEventListener,
+    addEventListener: (event, callback) => {
+      globalThis.addEventListener(event, callback);
+    },
     onmessage: (msg) => {},
   };
 
