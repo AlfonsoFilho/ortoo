@@ -8,7 +8,12 @@ import { serialize } from "./utils";
 // TODO: agent actor
 // TODO: main thread actor
 
-declare var fromActor: { ask: any; message: Message };
+declare var fromActor: {
+  ask: any;
+  message: Message;
+  setState: (state: any) => void;
+  getState: () => any;
+};
 
 export async function Ortoo(settings: Settings = {}) {
   // 1. create worker pool
@@ -22,9 +27,13 @@ export async function Ortoo(settings: Settings = {}) {
     start() {
       console.log("SYSTEM start!!!!");
       console.log("whoami", self);
+      const { setState, getState } = fromActor;
+      console.log("before", getState());
+      setState({ counter: 0 });
+      console.log("after", getState());
     },
     async spawn() {
-      const { ask, message } = fromActor;
+      const { ask, message, getState } = fromActor;
 
       console.log("props", fromActor);
 

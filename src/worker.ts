@@ -130,7 +130,6 @@ export function worker(thread = self) {
           id: actor.id,
           context: this.ctx,
           links: actor.links,
-          state: actor.state,
           behavior: actor.behavior.current,
 
           // Methods
@@ -152,7 +151,10 @@ export function worker(thread = self) {
           become: () => {},
           unbecome: () => {},
           link: () => {},
-          update: () => {},
+          setState: (newState) => {
+            actor.state = newState;
+          },
+          getState: () => actor.state,
         };
         actor.handlers[behavior][message.type](fromActor);
       } else {
