@@ -1,12 +1,14 @@
 import { createWorkerPool } from "./worker-pool";
 import { worker } from "./worker";
-import { Settings } from "./types";
+import { Settings, Message } from "./types";
 import { serialize } from "./utils";
 
 // TODO: timeout
 // TODO: extend actor
 // TODO: agent actor
 // TODO: main thread actor
+
+declare var fromActor: { ask: any; message: Message };
 
 export async function Ortoo(settings: Settings = {}) {
   // 1. create worker pool
@@ -22,15 +24,16 @@ export async function Ortoo(settings: Settings = {}) {
       console.log("whoami", self);
     },
     async spawn() {
-      // console.log("MAX", pool.maxWorkers);
-      // @ts-ignore
+      const { ask, message } = fromActor;
+
+      console.log("props", fromActor);
+
       console.log("asking system to spawn", message);
-      // @ts-ignore
+
       const id = await ask({
         receiver: "1.0",
         type: "SYSTEM_SPAWN",
         sender: "0.0",
-        // @ts-ignore
         payload: message.payload,
       });
       console.log("id", id);

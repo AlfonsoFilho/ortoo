@@ -43,34 +43,17 @@ export function worker(thread = self) {
 
       const originalStart = handlers[DEFAULT].start;
 
-      handlers[DEFAULT].start = (...params) => {
+      handlers[DEFAULT].start = (fromActor) => {
         if (typeof originalStart === "function") {
-          originalStart(...params);
+          originalStart(fromActor);
         }
 
-        /*
-             // Values
-          "message",
-          "id"
-          "ctx",
-          "links",
-          "state",
-          "behavior",
-          // Methods
-          "spawn",
-          "tell",
-          "ask",
-          "reply",
-          "become",
-          "unbecome",
-          "link",
-           */
-        const message = params[0];
+        const { id, message, tell } = fromActor;
 
-        params[7]({
+        tell({
           type: STARTED,
           receiver: message.sender,
-          sender: params[1],
+          sender: id,
           id: message.id,
         });
       };
@@ -127,11 +110,6 @@ export function worker(thread = self) {
       return Math.random().toString(32).substring(2, 12);
     }
 
-    private tell(actorId: string, message: Message) {
-      // console.log({ ...message, sender: actorId });
-      this.send({ ...message, sender: actorId });
-    }
-
     private consume(message: Message) {
       // console.log("consume ", thread.name, message);
       const actor = this.actors[message.receiver as any];
@@ -146,46 +124,37 @@ export function worker(thread = self) {
       }
 
       if (message.type in actor.handlers[behavior]) {
-        actor.handlers[behavior][message.type](
-          /*
-             // Values
-          "message",
-          "id"
-          "ctx",
-          "links",
-          "state",
-          "behavior",
-          // Methods
-          "spawn",
-          "tell",
-          "ask",
-          "reply",
-          "become",
-          "unbecome",
-          "link",
-           */
+        const fromActor = {
+          // Values
           message,
-          actor.id,
-          this.ctx,
-          actor.links,
-          actor.state,
-          actor.behavior.current,
-          /* spawn */ async (url: string, options = {}) =>
+          id: actor.id,
+          context: this.ctx,
+          links: actor.links,
+          state: actor.state,
+          behavior: actor.behavior.current,
+
+          // Methods
+          spawn: (url: string) => {
             futureMessage(this, {
               type: "spawn",
               receiver: "0.0",
               sender: actor.id,
               payload: { code: url },
-            }),
-
-          /* tell */ this.tell.bind(this, actor.id),
-
-          /* ask */ (msg: Message) =>
+            });
+          },
+          tell: (msg: Message) => this.send({ ...msg, sender: actor.id }),
+          ask: (msg: Message) =>
             futureMessage(this, {
               ...msg,
               sender: actor.id,
-            })
-        );
+            }),
+          reply: () => {},
+          become: () => {},
+          unbecome: () => {},
+          link: () => {},
+          update: () => {},
+        };
+        actor.handlers[behavior][message.type](fromActor);
       } else {
         if (typeof actor.handlers[behavior].unknown === "function") {
           actor.handlers[behavior].unknown({ test: true });
