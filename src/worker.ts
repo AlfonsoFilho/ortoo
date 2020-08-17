@@ -1,21 +1,46 @@
 import { Message } from "./types";
-import { deserialize } from "./utils";
 
 export function worker(thread = self) {
-  const SPAWN = "SPAWN";
-  const SETUP_WORKER = "SETUP_WORKER";
+  function serialize(localMod) {
+    return JSON.stringify(localMod, (k, v) => {
+      if (typeof v === "function") {
+        const code = v.toString();
+        return code
+          .replace(/\/\*[\s\S]*?\*\/|[\s\t]+\/\/.*/g, "")
+          .substring(code.indexOf("{") + 1, code.lastIndexOf("}"))
+          .trim();
+      }
+      return v;
+    });
+  }
+
+  function deserialize(txt) {
+    const { config = {}, ...obj } = JSON.parse(txt);
+    const AsyncFunction = Object.getPrototypeOf(async function () {})
+      .constructor;
+
+    for (const prop in obj) {
+      obj[prop] = new AsyncFunction("fromActor", obj[prop]);
+    }
+
+    return { ...obj, config };
+  }
+
   const STARTED = "STARTED";
   const DEFAULT = "DEFAULT";
   const RESUME = "RESUME";
-  const SYSTEM = "SYSTEM";
   const REPLY = "REPLY";
 
   class ActorsNode {
     private autoIncrement = 0;
     private actors = {};
-    private ctx = {};
+    private ctx = {
+      id: thread.name,
+    };
 
-    constructor() {}
+    constructor() {
+      thread.onmessage = ({ data }) => node.send(data);
+    }
 
     private createActor(handlers) {
       if (!(DEFAULT in handlers)) {
@@ -67,14 +92,14 @@ export function worker(thread = self) {
       };
     }
 
-    public async spawn(message) {
-      console.log("spawn", message);
+    public async spawn(message: Message) {
+      // console.log("spawn", thread.name, message);
       const handlers = deserialize(message.payload);
       const actor = this.createActor(handlers);
 
       this.actors[actor.id] = actor;
 
-      console.log("actors", this.actors);
+      // console.log("actors", this.actors);
       this.send({
         type: "start",
         receiver: actor.id,
@@ -84,13 +109,7 @@ export function worker(thread = self) {
       });
     }
 
-    public setContext(ctx: object) {
-      this.ctx = ctx;
-    }
-
     public send(message: Message) {
-      // debugger;
-      console.log("send?", message, thread.name);
       if (!message.id) {
         message.id = this.generateId();
       }
@@ -111,7 +130,6 @@ export function worker(thread = self) {
     }
 
     private consume(message: Message) {
-      // console.log("consume ", thread.name, message);
       const actor = this.actors[message.receiver as any];
       const behavior = actor.behavior.current;
 
@@ -136,7 +154,7 @@ export function worker(thread = self) {
           spawn: (url: string) => {
             futureMessage(this, {
               type: "spawn",
-              receiver: "0.0",
+              receiver: thread.name + ".0",
               sender: actor.id,
               payload: { code: url },
             });
@@ -156,23 +174,33 @@ export function worker(thread = self) {
           },
           getState: () => actor.state,
         };
+
+        // TODO: enable this only for thread actors
+        if (true) {
+          Object.setPrototypeOf(fromActor, {
+            localSpawn: (msg) => {
+              console.log("localSpawn");
+              this.spawn(msg);
+            },
+          });
+        }
+
         actor.handlers[behavior][message.type](fromActor);
       } else {
         if (typeof actor.handlers[behavior].unknown === "function") {
-          actor.handlers[behavior].unknown({ test: true });
+          actor.handlers[behavior].otherwise({ test: true });
         }
       }
     }
   }
 
   function futureMessage(_this: ActorsNode, msg: Message) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const msgId = _this.generateId();
 
       thread.addEventListener(
         RESUME + msgId,
         (e) => {
-          console.log("event!", e);
           resolve(e.detail.sender);
         },
         { once: true }
@@ -187,16 +215,25 @@ export function worker(thread = self) {
 
   const node = new ActorsNode();
 
-  thread.onmessage = async ({ data }) => {
-    switch (data.type) {
-      case "SYSTEM_SPAWN": {
-        node.spawn(data);
-        break;
-      }
-      default: {
-        node.send(data);
-        break;
-      }
-    }
+  const threadActor = {
+    async thread() {},
+    async start() {
+      //@ts-ignore
+      console.log("thread actor", fromActor);
+    },
+    async spawn() {
+      //@ts-ignore
+      const { message, localSpawn, context } = fromActor;
+      console.log("spawn??????", message);
+      console.log("context", context);
+      localSpawn(message);
+    },
   };
+
+  node.spawn({
+    receiver: `${thread.name}.0`,
+    type: "SPAWN",
+    sender: "0.0",
+    payload: serialize(threadActor),
+  });
 }
