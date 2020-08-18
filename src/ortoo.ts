@@ -1,6 +1,6 @@
 import { createWorkerPool } from "./worker-pool";
 import { worker } from "./worker";
-import { Settings, Message } from "./types";
+import { Settings, Message, WorkerPool } from "./types";
 
 // TODO: timeout
 // TODO: extend actor
@@ -38,8 +38,27 @@ export async function Ortoo(settings: Settings = {}) {
         type: "spawn",
         receiver: "1.0",
         sender: "0.0",
-        payload: serialize(settings.root),
+        payload: { code: serialize(settings.root) },
       });
     }, 0);
   }
+
+  for (const item of settings.middleware ?? []) {
+    item(pool);
+  }
+}
+
+export function OrtooDebugger(pool: WorkerPool) {
+  globalThis.OrtooDebug = {
+    getActors: () => {
+      console.log("Func from debugger", pool.workerList);
+      for (const workerId of Object.keys(pool.workerList)) {
+        pool.postMessage({
+          type: "info",
+          receiver: `${workerId}.0`,
+          sender: "*",
+        });
+      }
+    },
+  };
 }

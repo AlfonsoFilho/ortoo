@@ -120,12 +120,19 @@ export function worker(thread = self) {
         behavior: actor.behavior.current,
 
         // Methods
-        spawn: (url: string) => {
-          futureMessage(this, {
+        spawn: async (actorDefinition: string) => {
+          const payload =
+            typeof actorDefinition === "string"
+              ? { actorDefinition }
+              : { code: serialize(actorDefinition) };
+
+          console.log("spawn payload??", payload);
+
+          return futureMessage(this, {
             type: "spawn",
             receiver: thread.name + ".0",
             sender: actor.id,
-            payload: { code: url },
+            payload,
           });
         },
         tell: (msg: Message) => this.send({ ...msg, sender: actor.id }),
@@ -134,7 +141,15 @@ export function worker(thread = self) {
             ...msg,
             sender: actor.id,
           }),
-        reply: () => {},
+        reply: (msg: Partial<Message>) => {
+          this.send({
+            ...msg,
+            type: REPLY,
+            sender: actor.id,
+            receiver: message.sender,
+            id: message.id,
+          });
+        },
         become: () => {},
         unbecome: () => {},
         link: () => {},
@@ -150,6 +165,9 @@ export function worker(thread = self) {
         localSpawn: (msg) => {
           console.log("localSpawn");
           this.createActor(msg);
+        },
+        info: () => {
+          return this.actors;
         },
       });
     }
@@ -261,12 +279,26 @@ export function worker(thread = self) {
       //@ts-ignore
       console.log("thread actor", messageProps);
     },
+    async info() {
+      //@ts-ignore
+      const { info } = messageProps;
+      console.log("INFO", info());
+    },
     async spawn() {
       //@ts-ignore
-      const { message, localSpawn, context } = messageProps;
+      const { message, localSpawn, context, reply } = messageProps;
       console.log("spawn??????", message);
       console.log("context", context);
-      localSpawn(message);
+      if (message.payload.code) {
+        console.log("??", message.payload.code);
+        localSpawn({ ...message, payload: message.payload.code });
+        reply({ payload: "???" });
+      }
+
+      if (message.payload.url) {
+        console.warn("ERROR: url not supported yet");
+        // localSpawn({ ...message, payload: message.payload.code });
+      }
     },
   };
 

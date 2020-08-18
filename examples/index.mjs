@@ -1,4 +1,4 @@
-import { Ortoo } from "../dist/ortoo.modern.js";
+import { Ortoo, OrtooDebugger } from "../dist/ortoo.modern.js";
 
 console.log("ORTOO!!");
 
@@ -6,15 +6,21 @@ const rootActor = {
   config: {
     name: "test",
   },
-  start() {
-    console.log("whoami", self);
-    console.log("root actor start");
+  async start() {
+    const { context, spawn, info } = messageProps;
+    console.log("ROOT ACTOR: whoami", self);
+    console.log("ROOT ACTOR: context", context);
+    console.log("ROOT ACTOR: root actor start");
+    console.log("ROOT ACTOR: root actor has info?", info);
+    const id = await spawn({ start() { console.log('CHILD ACTOR: spawned !!!!') } })
+    console.log('ROOT ACTOR: spawned id: ', id)
   },
 };
 
 export const ortoo = Ortoo({
   root: rootActor,
   debug: true,
+  middleware: [OrtooDebugger]
 });
 
 // console.log('Ortoo?', ortoo, window?.Ortoo)

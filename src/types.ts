@@ -11,6 +11,7 @@ export interface Message {
 export interface Settings {
   root?: any;
   debug?: boolean;
+  middleware?: Array<(pool: WorkerPool) => void>;
 }
 
 export type WorkerPool = ReturnType<typeof createWorkerPool>;
