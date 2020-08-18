@@ -4,7 +4,7 @@ console.log("ORTOO!!");
 
 const rootActor = {
   config: {
-    name: 'test'
+    name: "test",
   },
   start() {
     console.log("whoami", self);
@@ -18,7 +18,6 @@ export const ortoo = Ortoo({
 });
 
 // console.log('Ortoo?', ortoo, window?.Ortoo)
-
 
 // --- OLD ---
 // import { Ortoo } from "../dist/ortoo.modern.js";

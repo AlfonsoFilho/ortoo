@@ -1,6 +1,4 @@
 {
-  "cSpell.words": [
-    "Ortoo"
-  ],
+  "cSpell.words": ["Ortoo"],
   "typescript.tsdk": "node_modules/typescript/lib"
 }

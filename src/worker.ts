@@ -1,31 +1,6 @@
 import { Message } from "./types";
 
 export function worker(thread = self) {
-  function serialize(localMod) {
-    return JSON.stringify(localMod, (k, v) => {
-      if (typeof v === "function") {
-        const code = v.toString();
-        return code
-          .replace(/\/\*[\s\S]*?\*\/|[\s\t]+\/\/.*/g, "")
-          .substring(code.indexOf("{") + 1, code.lastIndexOf("}"))
-          .trim();
-      }
-      return v;
-    });
-  }
-
-  function deserialize(txt) {
-    const { config = {}, ...obj } = JSON.parse(txt);
-    const AsyncFunction = Object.getPrototypeOf(async function () {})
-      .constructor;
-
-    for (const prop in obj) {
-      obj[prop] = new AsyncFunction("fromActor", obj[prop]);
-    }
-
-    return { ...obj, config };
-  }
-
   const STARTED = "STARTED";
   const DEFAULT = "DEFAULT";
   const RESUME = "RESUME";
@@ -42,10 +17,14 @@ export function worker(thread = self) {
       thread.onmessage = ({ data }) => node.send(data);
     }
 
-    private createActor(handlers) {
-      if (!(DEFAULT in handlers)) {
-        handlers = {
-          [DEFAULT]: handlers,
+    /**
+     * Get an actor definition and return a concrete actor object
+     * @param actorDefinition
+     */
+    private makeActorObject(actorDefinition) {
+      if (!(DEFAULT in actorDefinition)) {
+        actorDefinition = {
+          [DEFAULT]: actorDefinition,
         };
       }
 
@@ -66,14 +45,14 @@ export function worker(thread = self) {
       //   },
       // });
 
-      const originalStart = handlers[DEFAULT].start;
+      const originalStart = actorDefinition[DEFAULT].start;
 
-      handlers[DEFAULT].start = (fromActor) => {
+      actorDefinition[DEFAULT].start = (messageProps) => {
         if (typeof originalStart === "function") {
-          originalStart(fromActor);
+          originalStart(messageProps);
         }
 
-        const { id, message, tell } = fromActor;
+        const { id, message, tell } = messageProps;
 
         tell({
           type: STARTED,
@@ -85,21 +64,23 @@ export function worker(thread = self) {
 
       return {
         id,
-        handlers,
+        handlers: actorDefinition,
         behavior,
         state: {},
         links: [],
       };
     }
 
-    public async spawn(message: Message) {
-      // console.log("spawn", thread.name, message);
+    /**
+     * Create/Spawn a new actor in the current thread
+     * @param message
+     */
+    public async createActor(message: Message) {
       const handlers = deserialize(message.payload);
-      const actor = this.createActor(handlers);
+      const actor = this.makeActorObject(handlers);
 
       this.actors[actor.id] = actor;
 
-      // console.log("actors", this.actors);
       this.send({
         type: "start",
         receiver: actor.id,
@@ -109,9 +90,13 @@ export function worker(thread = self) {
       });
     }
 
+    /**
+     * Deliver message locally or to the worker-pool
+     * @param message
+     */
     public send(message: Message) {
       if (!message.id) {
-        message.id = this.generateId();
+        message.id = generateId();
       }
 
       if (!message.receiver) {
@@ -125,67 +110,73 @@ export function worker(thread = self) {
       }
     }
 
-    public generateId() {
-      return Math.random().toString(32).substring(2, 12);
+    private createMessageProps(actor, message) {
+      return {
+        // Values
+        message,
+        id: actor.id,
+        context: this.ctx,
+        links: actor.links,
+        behavior: actor.behavior.current,
+
+        // Methods
+        spawn: (url: string) => {
+          futureMessage(this, {
+            type: "spawn",
+            receiver: thread.name + ".0",
+            sender: actor.id,
+            payload: { code: url },
+          });
+        },
+        tell: (msg: Message) => this.send({ ...msg, sender: actor.id }),
+        ask: (msg: Message) =>
+          futureMessage(this, {
+            ...msg,
+            sender: actor.id,
+          }),
+        reply: () => {},
+        become: () => {},
+        unbecome: () => {},
+        link: () => {},
+        setState: (newState) => {
+          actor.state = newState;
+        },
+        getState: () => actor.state,
+      };
     }
 
+    private createThreadMethods(messageProps) {
+      Object.setPrototypeOf(messageProps, {
+        localSpawn: (msg) => {
+          console.log("localSpawn");
+          this.createActor(msg);
+        },
+      });
+    }
+
+    /**
+     * Consume a message and execute the receiver actor
+     * @param message
+     */
     private consume(message: Message) {
-      const actor = this.actors[message.receiver as any];
+      const actor = this.actors[message.receiver];
       const behavior = actor.behavior.current;
 
       if (message.type === REPLY || message.type === STARTED) {
-        // console.log("here?", thread.name, RESUME + message.id, message);
-        // console.log("thread??", thread, thread.dispatchEvent);
         thread.dispatchEvent(
           new CustomEvent(RESUME + message.id, { detail: message })
         );
       }
 
       if (message.type in actor.handlers[behavior]) {
-        const fromActor = {
-          // Values
-          message,
-          id: actor.id,
-          context: this.ctx,
-          links: actor.links,
-          behavior: actor.behavior.current,
-
-          // Methods
-          spawn: (url: string) => {
-            futureMessage(this, {
-              type: "spawn",
-              receiver: thread.name + ".0",
-              sender: actor.id,
-              payload: { code: url },
-            });
-          },
-          tell: (msg: Message) => this.send({ ...msg, sender: actor.id }),
-          ask: (msg: Message) =>
-            futureMessage(this, {
-              ...msg,
-              sender: actor.id,
-            }),
-          reply: () => {},
-          become: () => {},
-          unbecome: () => {},
-          link: () => {},
-          setState: (newState) => {
-            actor.state = newState;
-          },
-          getState: () => actor.state,
-        };
+        const messageProps = this.createMessageProps(actor, message);
 
         // TODO: enable this only for thread actors
-        if (true) {
-          Object.setPrototypeOf(fromActor, {
-            localSpawn: (msg) => {
-              console.log("localSpawn");
-              this.spawn(msg);
-            },
-          });
+        if (isThreadActor(actor.id)) {
+          this.createThreadMethods(messageProps);
         }
 
-        actor.handlers[behavior][message.type](fromActor);
+        actor.handlers[behavior][message.type](messageProps);
       } else {
         if (typeof actor.handlers[behavior].unknown === "function") {
           actor.handlers[behavior].otherwise({ test: true });
@@ -194,9 +185,19 @@ export function worker(thread = self) {
     }
   }
 
+  /**
+   * Check if an actor id is from a thread actor
+   */
+  function isThreadActor(id) {
+    return id.split(".")[1] === "0";
+  }
+
+  /**
+   * Handle asynchronous messages
+   */
   function futureMessage(_this: ActorsNode, msg: Message) {
     return new Promise((resolve) => {
-      const msgId = _this.generateId();
+      const msgId = generateId();
 
       thread.addEventListener(
         RESUME + msgId,
@@ -213,24 +214,65 @@ export function worker(thread = self) {
     });
   }
 
-  const node = new ActorsNode();
+  /**
+   * Generate random ids
+   */
+  function generateId() {
+    return Math.random().toString(32).substring(2, 12);
+  }
 
+  /**
+   * JSON.stringify with support to functions
+   */
+  function serialize(localMod) {
+    return JSON.stringify(localMod, (k, v) => {
+      if (typeof v === "function") {
+        const code = v.toString();
+        return code
+          .replace(/\/\*[\s\S]*?\*\/|[\s\t]+\/\/.*/g, "")
+          .substring(code.indexOf("{") + 1, code.lastIndexOf("}"))
+          .trim();
+      }
+      return v;
+    });
+  }
+
+  /**
+   * JSON.parse with support to async functions
+   */
+  function deserialize(txt) {
+    const { config = {}, ...obj } = JSON.parse(txt);
+    const AsyncFunction = Object.getPrototypeOf(async function () {})
+      .constructor;
+
+    for (const prop in obj) {
+      obj[prop] = new AsyncFunction("messageProps", obj[prop]);
+    }
+
+    return { ...obj, config };
+  }
+
+  /**
+   * ThreadActor - responsible to manage actors in the current thread
+   */
   const threadActor = {
     async thread() {},
     async start() {
       //@ts-ignore
-      console.log("thread actor", fromActor);
+      console.log("thread actor", messageProps);
     },
     async spawn() {
       //@ts-ignore
-      const { message, localSpawn, context } = fromActor;
+      const { message, localSpawn, context } = messageProps;
       console.log("spawn??????", message);
       console.log("context", context);
       localSpawn(message);
     },
   };
 
-  node.spawn({
+  const node = new ActorsNode();
+
+  node.createActor({
     receiver: `${thread.name}.0`,
     type: "SPAWN",
     sender: "0.0",

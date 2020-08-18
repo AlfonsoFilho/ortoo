@@ -1,7 +1,6 @@
 import { createWorkerPool } from "./worker-pool";
 import { worker } from "./worker";
 import { Settings, Message } from "./types";
-// import { serialize } from "./utils";
 
 // TODO: timeout
 // TODO: extend actor
@@ -9,7 +8,7 @@ import { Settings, Message } from "./types";
 // DONE: main thread actor
 // TODO: dead letters
 
-declare var fromActor: {
+declare var messageProps: {
   ask: any;
   message: Message;
   setState: (state: any) => void;
