@@ -1,31 +1,32 @@
 // export default {
-//   start() {
-//     console.log('HERE > root actor start !!!!')
-//   }
-// }
+//   async start(params) {
+//     console.log("HERE > root actor start !!!!", params);
+//   },
+// };
 
 export default {
   // async start({ payload, tell, ask, ctx, spawn, id, link, info, spawnCode }) {
-  async start(tell) {
+  async start(msg) {
+    const { message, context, tell, spawn } = msg;
     console.log(
       "ROOT:",
       "-------   Received?   ----------",
       message,
-      ctx,
+      context,
       tell
     );
 
     // tell({ payload: 'TEST ?', receiver: 'SYSTEM' })
 
-    const echoId = await spawn("./echo.mjs");
+    const echoId = await spawn("/examples/echo.mjs");
     console.log("ROOT: echoId", echoId);
 
-    tell({
-      type: "print",
-      receiver: echoId,
-      sender: id,
-      payload: "print this for me please!",
-    });
+    // tell({
+    //   type: "print",
+    //   receiver: echoId,
+    //   sender: id,
+    //   payload: "print this for me please!",
+    // });
 
     // const hasLink = await link(echoId);
 

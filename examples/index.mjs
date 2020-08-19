@@ -6,21 +6,25 @@ const rootActor = {
   config: {
     name: "test",
   },
-  async start() {
+  async start(messageProps) {
     const { context, spawn, info } = messageProps;
     console.log("ROOT ACTOR: whoami", self);
     console.log("ROOT ACTOR: context", context);
     console.log("ROOT ACTOR: root actor start");
     console.log("ROOT ACTOR: root actor has info?", info);
-    const id = await spawn({ start() { console.log('CHILD ACTOR: spawned !!!!') } })
-    console.log('ROOT ACTOR: spawned id: ', id)
+    const id = await spawn({
+      start() {
+        console.log("CHILD ACTOR: spawned !!!!");
+      },
+    });
+    console.log("ROOT ACTOR: spawned id: ", id);
   },
 };
 
 export const ortoo = Ortoo({
-  root: rootActor,
+  root: "/examples/root.mjs",
   debug: true,
-  middleware: [OrtooDebugger]
+  plugins: [OrtooDebugger],
 });
 
 // console.log('Ortoo?', ortoo, window?.Ortoo)

@@ -13,8 +13,8 @@ export class MainThread implements AbstractWorker {
     onmessage: (msg) => {},
   };
 
-  constructor(code: Function, options: Record<string, any>) {
-    code(this.worker);
+  constructor(code: Function, options: Record<string, any> = {}) {
+    code(this.worker, options);
 
     globalThis.addEventListener("ortoo:event", (e) => {
       this.onmessage(e.detail);

@@ -1,6 +1,6 @@
 import { Message } from "./types";
 
-export function worker(thread = self) {
+export function worker(thread = self, context) {
   const STARTED = "STARTED";
   const DEFAULT = "DEFAULT";
   const RESUME = "RESUME";
@@ -10,6 +10,7 @@ export function worker(thread = self) {
     private autoIncrement = 0;
     private actors = {};
     private ctx = {
+      ...context,
       id: thread.name,
     };
 
@@ -110,7 +111,15 @@ export function worker(thread = self) {
       }
     }
 
-    private createMessageProps(actor, message) {
+    private getSpawnWorker() {
+      return (
+        String(
+          Math.floor(Math.random() * Math.floor(this.ctx.maxWorkers)) + 1
+        ) + ".0"
+      );
+    }
+
+    private createMessageProps(actor, message: Message) {
       return {
         // Values
         message,
@@ -123,20 +132,21 @@ export function worker(thread = self) {
         spawn: async (actorDefinition: string) => {
           const payload =
             typeof actorDefinition === "string"
-              ? { actorDefinition }
+              ? { url: actorDefinition }
               : { code: serialize(actorDefinition) };
 
           console.log("spawn payload??", payload);
-
-          return futureMessage(this, {
+          const resp = await futureMessage(this, {
             type: "spawn",
-            receiver: thread.name + ".0",
+            receiver: this.getSpawnWorker(),
             sender: actor.id,
             payload,
           });
+
+          return resp.sender;
         },
         tell: (msg: Message) => this.send({ ...msg, sender: actor.id }),
-        ask: (msg: Message) =>
+        ask: (msg: Exclude<Message, "sender">) =>
           futureMessage(this, {
             ...msg,
             sender: actor.id,
@@ -160,16 +170,28 @@ export function worker(thread = self) {
       };
     }
 
-    private createThreadMethods(messageProps) {
-      Object.setPrototypeOf(messageProps, {
+    private createThreadMethods(actor, message) {
+      return {
+        ...this.createMessageProps(actor, message),
         localSpawn: (msg) => {
-          console.log("localSpawn");
           this.createActor(msg);
         },
         info: () => {
           return this.actors;
         },
-      });
+        parseModule,
+        serialize,
+        deserialize,
+      };
+    }
+
+    private createMainThreadMethods(actor, message) {
+      return {
+        ...this.createThreadMethods(actor, message),
+        importModule: (url: string) => {
+          return import(url).then((mod) => mod.default);
+        },
+      };
     }
 
     /**
@@ -187,12 +209,11 @@ export function worker(thread = self) {
       }
 
       if (message.type in actor.handlers[behavior]) {
-        const messageProps = this.createMessageProps(actor, message);
-
-        // TODO: enable this only for thread actors
-        if (isThreadActor(actor.id)) {
-          this.createThreadMethods(messageProps);
-        }
+        const messageProps = isThreadActor(actor.id)
+          ? isMainThreadActor(actor.id)
+            ? this.createMainThreadMethods(actor, message)
+            : this.createThreadMethods(actor, message)
+          : this.createMessageProps(actor, message);
 
         actor.handlers[behavior][message.type](messageProps);
       } else {
@@ -210,17 +231,21 @@ export function worker(thread = self) {
     return id.split(".")[1] === "0";
   }
 
+  function isMainThreadActor(id) {
+    return id === "0.0";
+  }
+
   /**
    * Handle asynchronous messages
    */
-  function futureMessage(_this: ActorsNode, msg: Message) {
+  function futureMessage(_this: ActorsNode, msg: Message): Promise<Message> {
     return new Promise((resolve) => {
       const msgId = generateId();
 
       thread.addEventListener(
         RESUME + msgId,
         (e) => {
-          resolve(e.detail.sender);
+          resolve(e.detail);
         },
         { once: true }
       );
@@ -239,6 +264,17 @@ export function worker(thread = self) {
     return Math.random().toString(32).substring(2, 12);
   }
 
+  function parseFunction(code) {
+    return {
+      body: code.substring(code.indexOf("{") + 1, code.lastIndexOf("}")).trim(),
+      paramName: code.match(/\w+\s(\w+)\(([a-z0-9]*)\)/)[2].trim(),
+    };
+  }
+
+  function removeComments(code) {
+    return code.replace(/\/\*[\s\S]*?\*\/|[\s\t]+\/\/.*/g, "");
+  }
+
   /**
    * JSON.stringify with support to functions
    */
@@ -246,10 +282,7 @@ export function worker(thread = self) {
     return JSON.stringify(localMod, (k, v) => {
       if (typeof v === "function") {
         const code = v.toString();
-        return code
-          .replace(/\/\*[\s\S]*?\*\/|[\s\t]+\/\/.*/g, "")
-          .substring(code.indexOf("{") + 1, code.lastIndexOf("}"))
-          .trim();
+        return parseFunction(removeComments(code));
       }
       return v;
     });
@@ -259,15 +292,34 @@ export function worker(thread = self) {
    * JSON.parse with support to async functions
    */
   function deserialize(txt) {
+    // console.log("deserialize:xt", txt);
     const { config = {}, ...obj } = JSON.parse(txt);
+    // console.log("deserialize:obj", obj);
     const AsyncFunction = Object.getPrototypeOf(async function () {})
       .constructor;
-
     for (const prop in obj) {
-      obj[prop] = new AsyncFunction("messageProps", obj[prop]);
+      const { body, paramName } = obj[prop];
+      obj[prop] = new AsyncFunction(paramName, body);
     }
 
     return { ...obj, config };
+  }
+
+  type ActorParams = ReturnType<ActorsNode["createMessageProps"]>;
+
+  type ThreadActorParams = ActorParams &
+    ReturnType<ActorsNode["createThreadMethods"]>;
+
+  type MainThreadActorParams = ThreadActorParams &
+    ReturnType<ActorsNode["createMainThreadMethods"]>;
+
+  function parseModule(code) {
+    code = removeComments(code);
+    code = code.substring(code.indexOf("{") + 1, code.lastIndexOf("}")).trim();
+
+    // console.log("CODE", code);
+    // console.log("CODE", serialize(code));
+    return deserialize(serialize(`{${code}}`));
   }
 
   /**
@@ -275,29 +327,48 @@ export function worker(thread = self) {
    */
   const threadActor = {
     async thread() {},
-    async start() {
-      //@ts-ignore
-      console.log("thread actor", messageProps);
+    async start(messageProps: ThreadActorParams) {
+      // const { setState } = messageProps; // from ortoo
+      // setState({
+      //   lastWorkerId: 0,
+      // });
+      // console.log("thread actor", messageProps);
     },
-    async info() {
-      //@ts-ignore
+    async info(messageProps: ThreadActorParams) {
       const { info } = messageProps;
       console.log("INFO", info());
     },
-    async spawn() {
-      //@ts-ignore
-      const { message, localSpawn, context, reply } = messageProps;
-      console.log("spawn??????", message);
-      console.log("context", context);
+    async import(msg: MainThreadActorParams) {
+      const { importModule, message, reply, serialize } = msg;
+      const code = await importModule(message.payload);
+      console.log("IMPORTing", message);
+      console.log("IMPORTED", code);
+      reply({ payload: serialize(code) });
+    },
+    async spawn(messageProps: ThreadActorParams) {
+      const {
+        message,
+        localSpawn,
+        parseModule,
+        context,
+        reply,
+        ask,
+        id,
+        deserialize,
+      } = messageProps;
       if (message.payload.code) {
-        console.log("??", message.payload.code);
         localSpawn({ ...message, payload: message.payload.code });
         reply({ payload: "???" });
       }
 
       if (message.payload.url) {
-        console.warn("ERROR: url not supported yet");
-        // localSpawn({ ...message, payload: message.payload.code });
+        const resp = await ask({
+          receiver: "0.0",
+          payload: message.payload.url,
+          type: "import",
+          sender: id,
+        });
+        localSpawn({ ...message, payload: resp.payload });
       }
     },
   };

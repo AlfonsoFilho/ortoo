@@ -7,6 +7,10 @@ import { Settings, Message, WorkerPool } from "./types";
 // DONE: agent actor
 // DONE: main thread actor
 // TODO: dead letters
+// TODO: ActorPool
+// TODO: load actor
+// TODO: dependency injection
+// TODO: testing suite
 
 declare var messageProps: {
   ask: any;
@@ -15,18 +19,19 @@ declare var messageProps: {
   getState: () => any;
 };
 
-function serialize(localMod) {
-  return JSON.stringify(localMod, (k, v) => {
-    if (typeof v === "function") {
-      const code = v.toString();
-      return code
-        .replace(/\/\*[\s\S]*?\*\/|[\s\t]+\/\/.*/g, "")
-        .substring(code.indexOf("{") + 1, code.lastIndexOf("}"))
-        .trim();
-    }
-    return v;
-  });
-}
+// // TODO: remove this
+// function serialize(localMod) {
+//   return JSON.stringify(localMod, (k, v) => {
+//     if (typeof v === "function") {
+//       const code = v.toString();
+//       return code
+//         .replace(/\/\*[\s\S]*?\*\/|[\s\t]+\/\/.*/g, "")
+//         .substring(code.indexOf("{") + 1, code.lastIndexOf("}"))
+//         .trim();
+//     }
+//     return v;
+//   });
+// }
 
 export async function Ortoo(settings: Settings = {}) {
   const pool = createWorkerPool(worker);
@@ -38,12 +43,13 @@ export async function Ortoo(settings: Settings = {}) {
         type: "spawn",
         receiver: "1.0",
         sender: "0.0",
-        payload: { code: serialize(settings.root) },
+        // payload: { code: serialize(settings.root) },
+        payload: { url: settings.root },
       });
     }, 0);
   }
 
-  for (const item of settings.middleware ?? []) {
+  for (const item of settings.plugins ?? []) {
     item(pool);
   }
 }
