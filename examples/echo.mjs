@@ -10,8 +10,12 @@ export default {
     );
   },
   async ciao(params) {
-    const { reply, sender, payload } = params;
-    reply({ receiver: sender, payload: payload + " world", type: "REPLY" });
+    const { reply, sender, message } = params;
+    reply({
+      receiver: sender,
+      payload: message.payload + " world",
+      type: "REPLY",
+    });
   },
 
   async otherwise(msg) {

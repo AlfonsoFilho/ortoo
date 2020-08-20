@@ -63,6 +63,15 @@ export function worker(thread = self, context) {
         });
       };
 
+      actorDefinition[DEFAULT].link = ({ links, sender, reply }) => {
+        links.push(sender);
+        reply({});
+      };
+
+      actorDefinition[DEFAULT].info = ({ reply, id, state, behavior }) => {
+        reply({ payload: { id, state, behavior } });
+      };
+
       return {
         id,
         handlers: actorDefinition,
@@ -162,11 +171,29 @@ export function worker(thread = self, context) {
         },
         become: () => {},
         unbecome: () => {},
-        link: () => {},
+        link: async (id: string) => {
+          const resp = await futureMessage(this, {
+            type: "link",
+            receiver: id,
+            sender: actor.id,
+            payload: null,
+          });
+
+          actor.links.push(id);
+        },
         setState: (newState) => {
           actor.state = newState;
         },
         getState: () => actor.state,
+        info: async (id) => {
+          const resp = await futureMessage(this, {
+            type: "info",
+            receiver: id,
+            sender: actor.id,
+          });
+
+          return resp.payload;
+        },
       };
     }
 
@@ -217,7 +244,7 @@ export function worker(thread = self, context) {
 
         actor.handlers[behavior][message.type](messageProps);
       } else {
-        if (typeof actor.handlers[behavior].unknown === "function") {
+        if (typeof actor.handlers[behavior].otherwise === "function") {
           actor.handlers[behavior].otherwise({ test: true });
         }
       }
