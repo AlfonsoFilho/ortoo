@@ -124,7 +124,7 @@ export function deserialize(txt: string) {
   return { ...obj, config };
 }
 
-function getSpawnWorker(ws: WorkerState): string {
+export function getSpawnWorker(ws: WorkerState): string {
   return (
     String(Math.floor(Math.random() * Math.floor(ws.context.maxWorkers)) + 1) +
     ".0"
@@ -359,18 +359,19 @@ export function bootstrapWorker(options: ThreadOptions) {
     context: {
       workerId: !!self.name ? self.name : "0",
       maxWorkers: getMaxThreads(),
+      settings: options.settings,
     },
   };
 
   // console.log("Bootstrap Worker!", workerState.context);
 
   workerState.channel.onmessage = ({ data }) => {
-    // console.log(
-    //   "message?",
-    //   data,
-    //   workerState,
-    //   isMessage(data) && isAddressedToCurrentThread(data, workerState)
-    // );
+    console.log(
+      "MSG?",
+      data,
+      workerState,
+      isMessage(data) && isAddressedToCurrentThread(data, workerState)
+    );
     if (isMessage(data) && isAddressedToCurrentThread(data, workerState)) {
       send(data, workerState);
     }
@@ -428,6 +429,15 @@ export function bootstrapWorker(options: ThreadOptions) {
       receiver: `${workerState.context.workerId}.0`,
       type: "SPAWN",
       payload: serialize(threadActor),
+    },
+    workerState
+  );
+
+  send(
+    {
+      type: "spawn",
+      receiver: "1.0",
+      payload: { url: options.settings.root },
     },
     workerState
   );

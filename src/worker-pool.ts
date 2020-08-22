@@ -1,9 +1,9 @@
-import { IThread } from "./types";
+import { IThread, Settings } from "./types";
 import { getMaxThreads } from "./utils";
 import { createMainThread } from "./main-thread";
 import { createWorkerThread } from "./worker-thread";
 
-export function createWorkerPool() {
+export function createWorkerPool(settings: Settings) {
   const maxWorkers = getMaxThreads() - 1;
   const workerList: Record<string, void | Worker> = {};
 
@@ -16,14 +16,14 @@ export function createWorkerPool() {
             id,
             isMainThread: true,
             maxWorkers,
-            thread: {} as IThread,
-          }) //   new MainThread(bootstrapWorker, { id, isMainThread: true, maxWorker })
+            settings,
+          })
         : createWorkerThread({
             id,
             isMainThread: false,
             maxWorkers,
-            thread: {} as IThread,
-          }); //  new WorkerThread(bootstrapWorker, { name: id, maxWorkers });
+            settings,
+          });
   }
 
   console.log("workerList??", workerList);

@@ -27,9 +27,9 @@ export type MainThreadActorParams = ThreadActorParams &
 
 export type BootstrapThread = typeof bootstrapWorker;
 export interface ThreadOptions {
-  [index: string]: string | number | boolean | IThread;
+  [index: string]: string | number | boolean | Settings;
   id: string;
-  thread: IThread;
+  settings: Settings;
   maxWorkers: number;
   isMainThread: boolean;
 }
@@ -50,13 +50,14 @@ export interface WorkerState {
   context: {
     maxWorkers: number;
     workerId: string;
+    settings: Settings;
   };
 }
 
 export interface Settings {
   root?: any;
   debug?: boolean;
-  plugins?: Array<(pool: WorkerPool, channel: BroadcastChannel) => void>;
+  plugins?: Array<(pool: WorkerPool) => void>;
 }
 
 export type WorkerPool = ReturnType<typeof createWorkerPool>;

@@ -16,6 +16,7 @@ import {
   bootstrapWorker,
   isAddressedToCurrentThread,
   isMessage,
+  getSpawnWorker,
 } from "./worker";
 import { getMaxThreads } from "./utils";
 
@@ -35,6 +36,7 @@ export function createWorkerThread(options: ThreadOptions) {
           serialize,
           isMessage,
           isAddressedToCurrentThread,
+          getSpawnWorker,
           futureMessage,
           generateId,
           parseModule,
