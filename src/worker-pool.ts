@@ -1,25 +1,35 @@
-import { Message } from "./types";
+import { IThread } from "./types";
 import { getMaxThreads } from "./utils";
-import { Thread } from "./thread";
+import { createMainThread } from "./main-thread";
+import { createWorkerThread } from "./worker-thread";
 
-export function createWorkerPool(code: Function) {
+export function createWorkerPool() {
   const maxWorkers = getMaxThreads() - 1;
-  const pool = {
-    workerList: {},
-    postMessage(message: Message): void {
-      const node = message.receiver.split(".")[0];
-      this.workerList[node].postMessage(message);
-    },
-  };
+  const workerList: Record<string, void | Worker> = {};
 
   // Create a worker instance for each thread
   for (let i = 0; i <= maxWorkers; i++) {
     const id = String(i);
-    pool.workerList[id] = new Thread(code, { name: id, maxWorkers });
-    pool.workerList[id].setOnMessage((e: MessageEvent) => {
-      pool.postMessage(e.data);
-    });
+    workerList[id] =
+      id === "0"
+        ? createMainThread({
+            id,
+            isMainThread: true,
+            maxWorkers,
+            thread: {} as IThread,
+          }) //   new MainThread(bootstrapWorker, { id, isMainThread: true, maxWorker })
+        : createWorkerThread({
+            id,
+            isMainThread: false,
+            maxWorkers,
+            thread: {} as IThread,
+          }); //  new WorkerThread(bootstrapWorker, { name: id, maxWorkers });
   }
 
-  return pool;
+  console.log("workerList??", workerList);
+
+  return {
+    workerList,
+    postMessage,
+  };
 }

@@ -1,35 +1,29 @@
-export class MainThread implements AbstractWorker {
-  private worker = {
-    name: "0",
-    postMessage: (msg) => {
-      this.onmessage({ data: msg });
-    },
-    dispatchEvent: (ev) => {
-      globalThis.dispatchEvent(ev);
-    },
-    addEventListener: (event, callback) => {
-      globalThis.addEventListener(event, callback);
-    },
-    onmessage: (msg) => {},
-  };
+import { bootstrapWorker } from "./worker";
+import { IThread, Message, BootstrapThread, ThreadOptions } from "./types";
 
-  constructor(code: Function, options: Record<string, any> = {}) {
-    code(this.worker, options);
-
-    globalThis.addEventListener("ortoo:event", (e) => {
-      this.onmessage(e.detail);
-    });
-  }
-
-  postMessage(msg) {
-    this.worker.onmessage({ data: msg });
-  }
-
-  onerror = () => {};
-
-  addEventListener() {}
-
-  removeEventListener() {}
-
-  onmessage = (msg) => {};
+export function createMainThread(options: ThreadOptions) {
+  return bootstrapWorker(options);
 }
+
+// export class MainThread extends IThread {
+//   private _worker!: Window;
+//   private callback;
+
+//   constructor(bootstrap: BootstrapThread, options: ThreadOptions) {
+//     console.log("MainThead new");
+//     super(bootstrap, options);
+//     bootstrap(options);
+//   }
+
+//   postMessage(msg: Message): void {
+//     console.log("MAIN trhead", msg);
+//     this.callback(msg);
+//     // globalThis.dispatchEvent(new CustomEvent("ortoo:event", { detail: msg }));
+//     // throw new Error("Method not implemented.");
+//   }
+//   onMessage(callback: (msg: import("./types").Message) => void): void {
+//     this.callback = callback;
+//     // globalThis.addEventListener("ortoo:event", (e) => console.log("WHAT?", e));
+//     // throw new Error("Method not implemented.");
+//   }
+// }
