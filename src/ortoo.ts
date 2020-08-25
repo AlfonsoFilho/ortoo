@@ -1,6 +1,6 @@
 import { Settings } from "./types";
-import { getMaxThreads } from "./utils";
 import { bootstrapThread, createWorker } from "./worker";
+import { getMaxThreads } from "./utils/max-threads";
 
 // TODO: timeout
 // TODO: extend actor
@@ -52,20 +52,4 @@ export async function Ortoo(settings: Settings = {}) {
       }
     }
   }
-}
-
-export function OrtooDebugger() {
-  // const channel = new BroadcastChannel("ortoo:channel");
-  // globalThis.OrtooDebug = {
-  //   getActors: () => {
-  //     const channel = new BroadcastChannel("__ortoo:channel__");
-  //     // console.log("Func from debugger", pool.workerList);
-  //     // for (const workerId of Object.keys(pool.workerList)) {
-  //     channel.postMessage({
-  //       type: "info",
-  //       receiver: `${workerId}.0`,
-  //     });
-  //     // }
-  //   },
-  // };
 }

@@ -1,12 +1,3 @@
-export function getMaxThreads() {
-  // return navigator.hardwareConcurrency;
-  return 3;
-}
-
-export function generateId() {
-  return Math.random().toString(32).substring(2, 12);
-}
-
 export function parseFunction(code: string) {
   return {
     body: code.substring(code.indexOf("{") + 1, code.lastIndexOf("}")).trim(),
@@ -28,18 +19,4 @@ export function serialize(localMod: object) {
     }
     return v;
   });
-}
-
-/**
- * JSON.parse with support to async functions
- */
-export function deserialize(txt: string) {
-  const { config = {}, ...obj } = JSON.parse(txt);
-  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
-  for (const prop in obj) {
-    const { body, paramName } = obj[prop];
-    obj[prop] = new AsyncFunction(paramName, body);
-  }
-
-  return { ...obj, config };
 }

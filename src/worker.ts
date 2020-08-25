@@ -1,49 +1,20 @@
-import {
-  Message,
-  WorkerState,
-  ActorObject,
-  ThreadActorParams,
-  MainThreadActorParams,
-} from "./types";
-import {
-  getMaxThreads,
-  generateId,
-  deserialize,
-  serialize,
-  removeComments,
-  parseFunction,
-} from "./utils";
-
-const STARTED = "STARTED";
-const DEFAULT = "DEFAULT";
-const RESUME = "RESUME";
-const REPLY = "REPLY";
-
-/**
- * tested: no
- * status: ready
- * pending:
- *  - clean comments
- *  - use getThreadId
- */
-export function send(message: Message, ws: WorkerState) {
-  if (!message.id) {
-    message.id = generateId();
-  }
-  const threadId = message.receiver.split(".")[0];
-  // console.log("message", message, ws);
-
-  if (threadId === ws.workerId) {
-    // when the actor is in the same thread
-    consume(message, ws);
-  } else if (Object.keys(ws.senders).includes(threadId)) {
-    // when the actor is in another thread
-    ws.senders[threadId].postMessage(message);
-  } else if (threadId === "*") {
-    // when message should be broadcasted to all threads
-    ws.channel.postMessage(message);
-  }
-}
+import { Message, WorkerState, ActorObject, ThreadActorParams } from "./types";
+import { messagingPlugin } from "./plugins/messaging-plugin";
+import { behaviorPlugin } from "./plugins/behavior-plugin";
+import { linkagePlugin } from "./plugins/linkage-plugin";
+import { statePlugin } from "./plugins/state-plugin";
+import { consume } from "./worker/consume";
+import { send } from "./worker/send";
+import { deserialize } from "./utils/deserialize";
+import { serialize, removeComments, parseFunction } from "./utils/serialize";
+import { futureMessage } from "./utils/future-message";
+import { getMaxThreads } from "./utils/max-threads";
+import { generateId } from "./utils/generate-id";
+import { createActorParams } from "./worker/actor-params";
+import { createPrivilegedActorParams } from "./worker/privileged-actor-params";
+import { usePlugins } from "./plugins/use-plugins";
+import { isMainThreadActor } from "./utils/is-main-thread-actor";
+import { parseModule } from "./utils/parse-module";
 
 /**
  * tested: no
@@ -55,9 +26,9 @@ export function send(message: Message, ws: WorkerState) {
  */
 export function makeActorObject(actorDefinition, ws: WorkerState) {
   // Ensure and actor has at leas one behavior
-  if (!(DEFAULT in actorDefinition)) {
+  if (!("DEFAULT" in actorDefinition)) {
     actorDefinition = {
-      [DEFAULT]: actorDefinition,
+      ["DEFAULT"]: actorDefinition,
     };
   }
 
@@ -65,7 +36,7 @@ export function makeActorObject(actorDefinition, ws: WorkerState) {
 
   const behavior = {
     _history: [] as string[],
-    _current: actorDefinition.config ?? DEFAULT,
+    _current: actorDefinition.config ?? "DEFAULT",
     // default: settings.behavior.default,
   };
 
@@ -82,7 +53,7 @@ export function makeActorObject(actorDefinition, ws: WorkerState) {
     const { id, message, tell } = messageProps;
     if (message.sender) {
       tell({
-        type: STARTED,
+        type: "STARTED",
         receiver: message.sender,
         sender: id,
         id: message.id,
@@ -113,14 +84,6 @@ export function makeActorObject(actorDefinition, ws: WorkerState) {
   };
 }
 
-function isThreadActor(id: string) {
-  return id.split(".")[1] === "0";
-}
-
-function isMainThreadActor(id: string) {
-  return id === "0.0";
-}
-
 export function getSpawnWorker(ws: WorkerState): string {
   // TODO: replace this
   return String(Math.floor(Math.random() * Math.floor(ws.maxWorkers))) + ".0";
@@ -149,234 +112,6 @@ export async function createActor(message: Message, ws: WorkerState) {
   );
 }
 
-export function createActorParams(
-  actor: ActorObject,
-  message: Message,
-  ws: WorkerState
-) {
-  return {
-    // Values
-    message,
-    id: actor.id,
-    context: ws,
-    links: actor.links,
-    behavior: actor.behavior._current,
-
-    // Methods
-    async spawn(actorDefinition: string) {
-      // TODO: fix typing
-      const payload =
-        typeof actorDefinition === "string"
-          ? { url: actorDefinition }
-          : { code: serialize(actorDefinition) };
-
-      const msg = {
-        type: "spawn",
-        receiver: getSpawnWorker(ws),
-        sender: actor.id,
-        payload,
-      };
-
-      const resp = await futureMessage(msg, ws);
-
-      return resp.sender;
-    },
-    tell(msg: Message) {
-      send({ ...msg, sender: actor.id }, ws);
-    },
-    ask(msg: Exclude<Message, "sender">) {
-      return futureMessage(
-        {
-          ...msg,
-          sender: actor.id,
-        },
-        ws
-      );
-    },
-    reply(msg: Partial<Message>) {
-      if (message.sender) {
-        send(
-          {
-            ...msg,
-            type: REPLY,
-            sender: actor.id,
-            receiver: message.sender,
-            id: message.id,
-          },
-          ws
-        );
-      }
-    },
-    become: (behavior: string) => {
-      const BEHAVIOR_HISTORY_LIMIT = 20;
-      if (actor.behavior._history.length <= BEHAVIOR_HISTORY_LIMIT) {
-        actor.behavior._history.push(actor.behavior._current);
-      } else {
-        const [_, ...history] = actor.behavior._history;
-        actor.behavior._history = [...history, actor.behavior._current];
-      }
-
-      actor.behavior._current = behavior;
-    },
-    unbecome: () => {
-      if (actor.behavior._history.length > 0) {
-        actor.behavior._current = actor.behavior._history.pop() ?? DEFAULT;
-      } else {
-        actor.behavior._current = DEFAULT;
-        // actor.behavior.current = actor.behavior.default;
-      }
-    },
-    link: async (id: string) => {
-      const resp = await futureMessage(
-        {
-          type: "link",
-          receiver: id,
-          sender: actor.id,
-        },
-        ws
-      );
-      actor.links.push(id);
-      return true;
-    },
-    unlink: async (id: string) => {
-      const resp = await futureMessage(
-        {
-          type: "link",
-          receiver: id,
-          sender: actor.id,
-        },
-        ws
-      );
-      actor.links = actor.links.filter((it) => it !== id);
-      return true;
-    },
-    broadcast: (msg: Message) => {
-      send(
-        {
-          ...msg,
-          receiver: "*",
-        },
-        ws
-      );
-    },
-    setState(newState) {
-      actor.state = newState;
-    },
-    getState: () => actor.state,
-    async info(id) {
-      const resp = await futureMessage(
-        {
-          type: "info",
-          receiver: id,
-          sender: actor.id,
-        },
-        ws
-      );
-
-      return resp.payload;
-    },
-  };
-}
-
-export function createPrivilegedActorParams(
-  actor: ActorObject,
-  message: Message,
-  ws: WorkerState
-) {
-  return {
-    ...createActorParams(actor, message, ws),
-    localSpawn: (msg) => {
-      createActor(msg, ws);
-    },
-    info: () => ws.actors,
-    parseModule,
-    serialize,
-    deserialize,
-    getWorkerState: () => ws,
-    isMainThread: () => isMainThreadActor(actor.id),
-    importModule: (url: string) => {
-      if (!isMainThreadActor(actor.id)) {
-        throw new Error("importModule must be executed in the main thread");
-      }
-      return import(url).then((mod) => mod.default);
-    },
-  };
-}
-
-// function usePlugins(
-//   actor: ActorObject,
-//   message: Message,
-//   ws: WorkerState,
-//   plugins: Function[]
-// ) {
-//   return plugins.reduce((acc, plugin) => {
-//     return { ...acc, ...plugin(actor, message, ws) };
-//   }, {});
-// }
-
-// function builtInSpawn(actor: ActorObject, message: Message, ws: WorkerState) {
-//   return {
-//     async spawn(actorDef: string) {},
-//     tell(msg: Message) {
-//       send({ ...msg, sender: actor.id }, ws);
-//     },
-//   };
-// }
-
-function consume(message: Message, ws: WorkerState) {
-  const actor = ws.actors[message.receiver];
-  const behavior = actor.behavior._current;
-
-  if (message.type === REPLY || message.type === STARTED) {
-    self.dispatchEvent(
-      new CustomEvent(RESUME + message.id, { detail: message })
-    );
-  }
-
-  if (message.type in actor.handlers[behavior]) {
-    const actorParams = isThreadActor(actor.id)
-      ? createPrivilegedActorParams(actor, message, ws)
-      : createActorParams(actor, message, ws);
-
-    actor.handlers[behavior][message.type](actorParams);
-  } else {
-    if (typeof actor.handlers[behavior].otherwise === "function") {
-      actor.handlers[behavior].otherwise({ test: true });
-    } else {
-      ws.deadLetters.push(message);
-    }
-  }
-}
-
-export function futureMessage(msg: Message, ws: WorkerState): Promise<Message> {
-  return new Promise((resolve) => {
-    const msgId = generateId();
-
-    self.addEventListener(
-      RESUME + msgId,
-      (e) => {
-        resolve(e.detail);
-      },
-      { once: true }
-    );
-
-    send(
-      {
-        ...msg,
-        id: msgId,
-      },
-      ws
-    );
-  });
-}
-
-export function parseModule(code) {
-  code = removeComments(code);
-  code = code.substring(code.indexOf("{") + 1, code.lastIndexOf("}")).trim();
-
-  return deserialize(`{${code}}`);
-}
-
 export function isMessage(msg: Partial<Message> = {}): boolean {
   const hasType = typeof msg.type === "string";
   const hasReceiver = typeof msg.receiver === "string";
@@ -397,7 +132,7 @@ function startThreadActor(ws: WorkerState) {
       const { message } = ortoo;
       console.log("PING", message);
     },
-    async start(messageProps: MainThreadActorParams) {
+    async start(messageProps: ThreadActorParams) {
       const {
         getWorkerState,
         isMainThread,
@@ -420,7 +155,7 @@ function startThreadActor(ws: WorkerState) {
       const { info } = messageProps;
       console.log("INFO", info());
     },
-    async import(msg: MainThreadActorParams) {
+    async import(msg: ThreadActorParams) {
       const { importModule, message, reply, serialize } = msg;
       const code = await importModule(message.payload);
       reply({ payload: serialize(code) });
@@ -506,7 +241,6 @@ export function createWorker(
     serialize,
     deserialize,
     getMaxThreads,
-    isThreadActor,
     isMainThreadActor,
     futureMessage,
     consume,
@@ -514,6 +248,11 @@ export function createWorker(
     createActorParams,
     createActor,
     send,
+    usePlugins,
+    messagingPlugin,
+    behaviorPlugin,
+    linkagePlugin,
+    statePlugin,
     bootstrap,
   ].map((it) => it.toString());
 

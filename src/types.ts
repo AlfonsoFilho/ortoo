@@ -1,9 +1,5 @@
-import {
-  makeActorObject,
-  createActorParams,
-  createPrivilegedActorParams,
-  bootstrapThread,
-} from "./worker";
+import { makeActorObject, bootstrapThread } from "./worker";
+import { createPrivilegedActorParams } from "./worker/privileged-actor-params";
 
 export interface Message {
   id?: string;
@@ -11,11 +7,16 @@ export interface Message {
   receiver: string;
   type: string;
   payload?: any;
+  meta?: {
+    [index: string]: boolean | string | number | undefined | null;
+    reply?: boolean;
+  };
 }
 
 export type ActorObject = ReturnType<typeof makeActorObject>;
 
-export type ActorParams = ReturnType<typeof createActorParams>;
+// export type ActorParams = ReturnType<typeof createActorParams>;
+export type ActorParams = any;
 
 export type ThreadActorParams = ActorParams &
   ReturnType<typeof createPrivilegedActorParams>;
@@ -42,6 +43,7 @@ export interface WorkerState {
   deadLetters: Message[];
   maxWorkers: number;
   workerId: string;
+  plugins?: {};
 }
 
 export interface Settings {

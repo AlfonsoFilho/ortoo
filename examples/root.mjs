@@ -30,7 +30,7 @@ export default {
 
     const hasLink = await link(echoId);
 
-    console.log('haslink', hasLink)
+    console.log("haslink", hasLink);
 
     // setTimeout(() => {
     //   tell({
