@@ -132,6 +132,11 @@ export function getSpawnWorker(ws: WorkerState): string {
   return String(Math.floor(Math.random() * Math.floor(ws.maxWorkers))) + ".0";
 }
 
+/**
+ * tested: no
+ * status: ready
+ * pending:
+ */
 export async function createActor(message: Message, ws: WorkerState) {
   const handlers = deserialize(message.payload);
   const actor = makeActorObject(handlers, ws);
