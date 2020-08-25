@@ -4,7 +4,6 @@ import { behaviorPlugin } from "../plugins/behavior-plugin";
 import { linkagePlugin } from "../plugins/linkage-plugin";
 import { statePlugin } from "../plugins/state-plugin";
 import { serialize } from "../utils/serialize";
-import { getSpawnWorker } from "../worker";
 import { futureMessage } from "../utils/future-message";
 import { usePlugins } from "../plugins/use-plugins";
 
@@ -38,7 +37,8 @@ export function createActorParams(
 
       const msg = {
         type: "spawn",
-        receiver: getSpawnWorker(ws),
+        receiver:
+          String(Math.floor(Math.random() * Math.floor(ws.maxWorkers))) + ".0",
         sender: actor.id,
         payload,
       };

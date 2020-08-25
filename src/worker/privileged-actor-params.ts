@@ -1,10 +1,10 @@
 import { ActorObject, Message, WorkerState } from "../types";
 import { createActorParams } from "./actor-params";
-import { createActor } from "../worker";
 import { isMainThreadActor } from "../utils/is-main-thread-actor";
 import { serialize } from "../utils/serialize";
 import { deserialize } from "../utils/deserialize";
 import { parseModule } from "../utils/parse-module";
+import { createActor } from "./create-actor";
 
 export function createPrivilegedActorParams(
   actor: ActorObject,
@@ -13,7 +13,7 @@ export function createPrivilegedActorParams(
 ) {
   return {
     ...createActorParams(actor, message, ws),
-    localSpawn: (msg) => {
+    localSpawn: (msg: Message) => {
       createActor(msg, ws);
     },
     info: () => ws.actors,

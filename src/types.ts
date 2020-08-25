@@ -1,5 +1,6 @@
-import { makeActorObject, bootstrapThread } from "./worker";
+import { bootstrapThread } from "./worker/bootstrap";
 import { createPrivilegedActorParams } from "./worker/privileged-actor-params";
+import { makeActorObject } from "./worker/create-actor";
 
 export interface Message {
   id?: string;

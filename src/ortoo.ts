@@ -1,6 +1,6 @@
 import { Settings } from "./types";
-import { bootstrapThread, createWorker } from "./worker";
 import { getMaxThreads } from "./utils/max-threads";
+import { bootstrapThread, createWorker } from "./worker/bootstrap";
 
 // TODO: timeout
 // TODO: extend actor
