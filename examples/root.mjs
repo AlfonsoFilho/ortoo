@@ -16,7 +16,7 @@ export default {
       tell
     );
 
-    // tell({ payload: 'TEST ?', receiver: 'SYSTEM' })
+    tell({ type: "ping", payload: "TEST ?", receiver: "0.0" });
 
     const echoId = await spawn("/examples/echo.mjs");
     console.log("ROOT: echoId", echoId);
@@ -30,6 +30,8 @@ export default {
 
     const hasLink = await link(echoId);
 
+    console.log('haslink', hasLink)
+
     // setTimeout(() => {
     //   tell({
     //     type: "terminate",
@@ -39,18 +41,18 @@ export default {
     //   });
     // }, 1000);
 
-    const echoInfo = await info(echoId);
+    // const echoInfo = await info(echoId);
 
-    console.log("echo info", echoInfo);
+    // console.log("echo info", echoInfo);
 
-    const response = await ask({
-      type: "ciao",
-      receiver: echoId,
-      payload: "hello",
-    });
-    console.log("respose", response);
+    // const response = await ask({
+    //   type: "ciao",
+    //   receiver: echoId,
+    //   payload: "hello",
+    // });
+    // console.log("respose", response);
 
-    tell({ type: "wrong", receiver: echoId, payload: "test" });
+    // tell({ type: "wrong", receiver: echoId, payload: "test" });
 
     // const actorWithBehaviourID = await spawn("./actor-with-behaviour.mjs");
     // console.log("actorWithBehaviourID", actorWithBehaviourID);

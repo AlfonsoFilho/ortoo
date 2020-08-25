@@ -7,10 +7,10 @@ export function generateId() {
   return Math.random().toString(32).substring(2, 12);
 }
 
-export function parseFunction(code) {
+export function parseFunction(code: string) {
   return {
     body: code.substring(code.indexOf("{") + 1, code.lastIndexOf("}")).trim(),
-    paramName: code.match(/\w+\s(\w+)\(([a-z0-9]*)\)/)[2].trim(),
+    paramName: code.match(/\w+\s(\w+)\(([a-z0-9]*)\)/)![2].trim(),
   };
 }
 

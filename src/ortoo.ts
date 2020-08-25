@@ -1,4 +1,4 @@
-import { Settings, WorkerPool } from "./types";
+import { Settings } from "./types";
 import { getMaxThreads } from "./utils";
 import { bootstrapThread, createWorker } from "./worker";
 

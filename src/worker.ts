@@ -54,6 +54,7 @@ export function send(message: Message, ws: WorkerState) {
  *  - implement behaviors
  */
 export function makeActorObject(actorDefinition, ws: WorkerState) {
+  // Ensure and actor has at leas one behavior
   if (!(DEFAULT in actorDefinition)) {
     actorDefinition = {
       [DEFAULT]: actorDefinition,
@@ -63,24 +64,17 @@ export function makeActorObject(actorDefinition, ws: WorkerState) {
   const id = `${ws.workerId}.${ws.autoIncrement++}`;
 
   const behavior = {
-    history: [],
-    current: DEFAULT,
+    _history: [] as string[],
+    _current: actorDefinition.config ?? DEFAULT,
     // default: settings.behavior.default,
   };
 
-  // Object.setPrototypeOf(handlers[DEFAULT], {
-  //   start(...a) {
-  //     console.log("start default handler ", id, a);
-  //   },
-  //   stop() {
-  //     console.log("stop default handler ", id);
-  //   },
-  // });
+  const originalStart = actorDefinition[behavior._current].start;
+  const originalInfo = actorDefinition[behavior._current].info;
 
-  const originalStart = actorDefinition[DEFAULT].start;
-  const originalInfo = actorDefinition[DEFAULT].info;
-
-  actorDefinition[DEFAULT].start = (messageProps: ThreadActorParams) => {
+  actorDefinition[behavior._current].start = (
+    messageProps: ThreadActorParams
+  ) => {
     if (typeof originalStart === "function") {
       originalStart(messageProps);
     }
@@ -96,12 +90,12 @@ export function makeActorObject(actorDefinition, ws: WorkerState) {
     }
   };
 
-  actorDefinition[DEFAULT].link = ({ links, sender, reply }) => {
+  actorDefinition[behavior._current].link = ({ links, sender, reply }) => {
     links.push(sender);
     reply({});
   };
 
-  actorDefinition[DEFAULT].info = (msg) => {
+  actorDefinition[behavior._current].info = (msg) => {
     const { reply, id, state, behavior } = msg;
     console.log("INF??", originalInfo);
     if (typeof originalInfo === "function") {
@@ -155,7 +149,7 @@ export async function createActor(message: Message, ws: WorkerState) {
   );
 }
 
-function createActorParams(
+export function createActorParams(
   actor: ActorObject,
   message: Message,
   ws: WorkerState
@@ -166,7 +160,7 @@ function createActorParams(
     id: actor.id,
     context: ws,
     links: actor.links,
-    behavior: actor.behavior.current,
+    behavior: actor.behavior._current,
 
     // Methods
     async spawn(actorDefinition: string) {
@@ -213,12 +207,58 @@ function createActorParams(
         );
       }
     },
-    become: () => {},
-    unbecome: () => {},
-    link: async (id: string) => {
-      actor.links.push(id);
+    become: (behavior: string) => {
+      const BEHAVIOR_HISTORY_LIMIT = 20;
+      if (actor.behavior._history.length <= BEHAVIOR_HISTORY_LIMIT) {
+        actor.behavior._history.push(actor.behavior._current);
+      } else {
+        const [_, ...history] = actor.behavior._history;
+        actor.behavior._history = [...history, actor.behavior._current];
+      }
+
+      actor.behavior._current = behavior;
     },
-    unlink: () => {},
+    unbecome: () => {
+      if (actor.behavior._history.length > 0) {
+        actor.behavior._current = actor.behavior._history.pop() ?? DEFAULT;
+      } else {
+        actor.behavior._current = DEFAULT;
+        // actor.behavior.current = actor.behavior.default;
+      }
+    },
+    link: async (id: string) => {
+      const resp = await futureMessage(
+        {
+          type: "link",
+          receiver: id,
+          sender: actor.id,
+        },
+        ws
+      );
+      actor.links.push(id);
+      return true;
+    },
+    unlink: async (id: string) => {
+      const resp = await futureMessage(
+        {
+          type: "link",
+          receiver: id,
+          sender: actor.id,
+        },
+        ws
+      );
+      actor.links = actor.links.filter((it) => it !== id);
+      return true;
+    },
+    broadcast: (msg: Message) => {
+      send(
+        {
+          ...msg,
+          receiver: "*",
+        },
+        ws
+      );
+    },
     setState(newState) {
       actor.state = newState;
     },
@@ -238,7 +278,7 @@ function createActorParams(
   };
 }
 
-function createPrivilegedActorParams(
+export function createPrivilegedActorParams(
   actor: ActorObject,
   message: Message,
   ws: WorkerState
@@ -285,7 +325,7 @@ function createPrivilegedActorParams(
 
 function consume(message: Message, ws: WorkerState) {
   const actor = ws.actors[message.receiver];
-  const behavior = actor.behavior.current;
+  const behavior = actor.behavior._current;
 
   if (message.type === REPLY || message.type === STARTED) {
     self.dispatchEvent(
@@ -348,41 +388,7 @@ export function isAddressedToCurrentThread(msg: Message, ws: WorkerState) {
   return threadId === ws.workerId;
 }
 
-export function bootstrapThread(thread: any = self, options) {
-  const receivers = {};
-  const senders = {};
-  const channel = new BroadcastChannel("__ortoo:channel__");
-  const workerState: WorkerState = {
-    autoIncrement: 0,
-    actors: {},
-    channel,
-    senders,
-    options,
-    deadLetters: [],
-    workerId: thread.name,
-    maxWorkers: getMaxThreads(),
-  };
-
-  // Broadcast handler
-  channel.onmessage = ({ data }) => {
-    console.log(`worker ${thread.name} received broadcasted message: `, data);
-    consume(data, workerState);
-  };
-
-  // Worker PostMessage handler
-  thread.onmessage = (e) => {
-    if (e.data.receiver_port) {
-      receivers[e.data.worker] = e.data.receiver_port;
-      receivers[e.data.worker].onmessage = (e) => {
-        send(e.data, workerState);
-      };
-    }
-
-    if (e.data.sender_port) {
-      senders[e.data.worker] = e.data.sender_port;
-    }
-  };
-
+function startThreadActor(ws: WorkerState) {
   /**
    * ThreadActor - responsible to manage actors in the current thread
    */
@@ -441,12 +447,50 @@ export function bootstrapThread(thread: any = self, options) {
 
   createActor(
     {
-      receiver: `${workerState.workerId}.0`,
+      receiver: `${ws.workerId}.0`,
       type: "SPAWN",
       payload: serialize(threadActor),
     },
-    workerState
+    ws
   );
+}
+
+export function bootstrapThread(thread: any = self, options) {
+  const receivers = {};
+  const senders = {};
+  const channel = new BroadcastChannel("__ortoo:channel__");
+  const workerState: WorkerState = {
+    autoIncrement: 0,
+    actors: {},
+    channel,
+    senders,
+    options,
+    deadLetters: [],
+    workerId: thread.name,
+    maxWorkers: getMaxThreads(),
+  };
+
+  // Broadcast handler
+  channel.onmessage = ({ data }) => {
+    console.log(`worker ${thread.name} received broadcasted message: `, data);
+    consume(data, workerState);
+  };
+
+  // Worker PostMessage handler
+  thread.onmessage = (e: MessageEvent) => {
+    if (e.data.receiver_port) {
+      receivers[e.data.worker] = e.data.receiver_port;
+      receivers[e.data.worker].onmessage = (e: MessageEvent) => {
+        send(e.data, workerState);
+      };
+    }
+
+    if (e.data.sender_port) {
+      senders[e.data.worker] = e.data.sender_port;
+    }
+  };
+
+  startThreadActor(workerState);
 }
 
 export function createWorker(
