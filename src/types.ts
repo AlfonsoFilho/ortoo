@@ -47,17 +47,20 @@ export interface WorkerState {
   autoIncrement: number;
   actors: Record<string, ActorObject>;
   channel: BroadcastChannel;
-  context: {
-    maxWorkers: number;
-    workerId: string;
-    settings: Settings;
+  senders: Record<string, MessagePort>;
+  options: {
+    [index: string]: any;
+    root: string;
   };
+  deadLetters: Message[];
+  maxWorkers: number;
+  workerId: string;
 }
 
 export interface Settings {
   root?: any;
   debug?: boolean;
-  plugins?: Array<(pool: WorkerPool) => void>;
+  plugins?: Array<(...args: any[]) => void>;
 }
 
 export type WorkerPool = ReturnType<typeof createWorkerPool>;
